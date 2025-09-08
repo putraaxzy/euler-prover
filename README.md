@@ -844,7 +844,7 @@ Implementasi ini telah digunakan dalam:
 
 ## 📄 Lisensi dan Sitasi
 
-**Lisensi**: MIT License - lihat file LICENSE untuk detail lengkap.
+**Lisensi**: [MIT License](LICENSE) - lihat file LICENSE untuk detail lengkap.
 
 **Sitasi Akademik**:
 
