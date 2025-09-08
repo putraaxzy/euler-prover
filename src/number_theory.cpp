@@ -78,7 +78,7 @@ bool is_prime_miller_rabin(uint64_t n, size_t rounds) {
     SecureRNG rng;
     
     for (size_t i = 0; i < rounds; i++) {
-        uint64_t a = rng.uniform(2ULL, n - 2);
+        uint64_t a = rng.uniform(static_cast<uint64_t>(2), n - 2);
         uint64_t x = mod_pow(a, d, n);
         
         if (x == 1 || x == n - 1) continue;
@@ -104,8 +104,8 @@ uint64_t pollard_rho_factor(uint64_t n) {
     SecureRNG rng;
     
     for (int attempt = 0; attempt < 10; attempt++) {
-        uint64_t x = rng.uniform(2ULL, n - 1);
-        uint64_t c = rng.uniform(1ULL, n - 1);
+        uint64_t x = rng.uniform(static_cast<uint64_t>(2), n - 1);
+        uint64_t c = rng.uniform(static_cast<uint64_t>(1), n - 1);
         uint64_t y = x;
         uint64_t d = 1;
         
@@ -228,7 +228,7 @@ EulerTestResult stress_test_euler_theorem(uint64_t max_n, size_t tests_per_n, si
                 continue;
             }
             
-            uint64_t a = rng.uniform(2ULL, n - 1);
+            uint64_t a = rng.uniform(static_cast<uint64_t>(2), n - 1);
             
             if (std::__gcd(a, n) != 1) {
                 result.skipped_tests++;
