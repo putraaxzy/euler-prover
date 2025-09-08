@@ -66,9 +66,9 @@ ComplexBenchmark benchmark_euler_formula(size_t num_samples) {
     // Simple sequential version
     for (size_t i = 0; i < num_samples; i++) {
         Real theta = rng.uniform(-100.0L * M_PI, 100.0L * M_PI);
-        theta = std::fmodl(theta, 2.0L * M_PI);
+        theta = std::fmod(theta, 2.0L * M_PI);
         
-        Complex reference(std::cosl(theta), std::sinl(theta));
+        Complex reference(std::cos(theta), std::sin(theta));
         Complex test_result = exp_taylor_adaptive(Complex(0.0L, theta));
         
         Real error = std::abs(reference - test_result);
@@ -92,7 +92,7 @@ ComplexBenchmark benchmark_euler_formula(size_t num_samples) {
         Real diff = error - mean;
         variance_sum.add(diff * diff);
     }
-    benchmark.std_deviation_error = std::sqrtl(variance_sum.get() / static_cast<Real>(num_samples - 1));
+    benchmark.std_deviation_error = std::sqrt(variance_sum.get() / static_cast<Real>(num_samples - 1));
     
     for (Real error : errors) {
         int bin = static_cast<int>(std::min(99.0L, error / max_error * 99));
