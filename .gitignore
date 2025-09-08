@@ -1,0 +1,64 @@
+# Build artifacts
+*.exe
+*.o
+*.obj
+*.dll
+*.so
+*.dylib
+*.a
+*.lib
+
+# Build directories  
+build/
+bin/
+obj/
+
+# IDE files
+.vscode/
+.vs/
+*.vcxproj*
+*.sln
+*.suo
+*.user
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+*.swp
+*.swo
+*~
+
+# Compiler cache
+.ccache/
+*.gch
+*.pch
+
+# Debug files
+core
+*.core
+*.dSYM/
+
+# Backup files
+*.bak
+*.backup
+*_backup.*
+
+# Test outputs
+test_output/
+*.test
+gmon.out
+
+# Documentation fragments (keep only README.md)
+*.md
+!README.md
+
+# Extra build files
+Makefile.*
+*_setup.bat
+ultra_*
