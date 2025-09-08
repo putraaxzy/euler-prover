@@ -42,7 +42,14 @@ cd euler-prover
 a^φ(n) ≡ 1 (mod n)
 ```
 
-\*\*F---
+**Fitur Implementasi**:
+
+- Aritmetika Montgomery untuk eksponensial modular yang efisien
+- Uji primalitas Miller-Rabin dengan presisi tinggi
+- Faktorisasi Pollard's rho untuk bilangan komposit
+- Optimisasi fungsi lambda Carmichael
+- Stress testing dengan parameter yang dapat dikonfigurasi
+- Parallelisasi OpenMP untuk komputasi masif
 
 _"Matematika adalah ratu dari ilmu pengetahuan, dan teori bilangan adalah ratu dari matematika."_ - Carl Friedrich Gauss
 
