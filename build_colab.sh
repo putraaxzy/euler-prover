@@ -57,13 +57,33 @@ fi
 # Always create lightweight version without VTK
 echo "Creating lightweight version..."
 cd .. 
+
+# Check if ultra_precision.cpp exists
+ULTRA_PRECISION=""
+if [ -f "src/ultra_precision.cpp" ]; then
+    ULTRA_PRECISION="src/ultra_precision.cpp"
+fi
+
 g++ $CXXFLAGS \
     -Iinclude \
     -DVTK_FOUND=0 \
     src/main.cpp src/number_theory.cpp src/complex_analysis.cpp \
     src/topology.cpp src/progress.cpp src/rng.cpp src/visualization.cpp \
-    src/ultra_precision.cpp \
-    -o build_colab/euler_lite
+    $ULTRA_PRECISION \
+    -o build_colab/euler_lite 2>/dev/null
+
+if [ $? -eq 0 ]; then
+    echo "✓ Lite version created successfully"
+else
+    echo "⚠ Lite version build failed, creating minimal version"
+    g++ $CXXFLAGS \
+        -Iinclude \
+        -DVTK_FOUND=0 -DNO_VISUALIZATION=1 \
+        src/main.cpp src/number_theory.cpp src/complex_analysis.cpp \
+        src/topology.cpp src/progress.cpp src/rng.cpp \
+        $ULTRA_PRECISION \
+        -o build_colab/euler_lite
+fi
 
 # Create VTK-free visualization version
 echo "Creating basic computation version..."
@@ -72,15 +92,47 @@ g++ $CXXFLAGS \
     -DVTK_FOUND=0 -DBASIC_BUILD=1 \
     src/main.cpp src/number_theory.cpp src/complex_analysis.cpp \
     src/topology.cpp src/progress.cpp src/rng.cpp src/visualization.cpp \
-    src/ultra_precision.cpp \
-    -o build_colab/euler_basic
+    $ULTRA_PRECISION \
+    -o build_colab/euler_basic 2>/dev/null
+
+if [ $? -ne 0 ]; then
+    echo "⚠ Basic version build failed, creating computation-only version"
+    g++ $CXXFLAGS \
+        -Iinclude \
+        -DVTK_FOUND=0 -DNO_VISUALIZATION=1 \
+        src/main.cpp src/number_theory.cpp src/complex_analysis.cpp \
+        src/topology.cpp src/progress.cpp src/rng.cpp \
+        $ULTRA_PRECISION \
+        -o build_colab/euler_basic
+fi
 cd build_colab
 
 echo "✓ Build completed successfully!"
-echo "✓ Full version: ./euler (with VTK visualization)"
-echo "✓ Lite version: ./euler_lite (PPM output only)"
+
+# Check which executables were actually created
+if [ -f "euler" ]; then
+    echo "✓ Full version: ./euler (with VTK visualization)"
+fi
+
+if [ -f "euler_lite" ]; then
+    echo "✓ Lite version: ./euler_lite (PPM output only)"
+fi
+
+if [ -f "euler_basic" ]; then
+    echo "✓ Basic version: ./euler_basic (computation only)"
+fi
+
 echo ""
 echo "Quick test commands:"
-echo "  ./euler proof number 1000 10 4"
-echo "  ./euler visualize primes 500"
-echo "  ./euler_lite proof complex 10000 15"
+if [ -f "euler" ]; then
+    echo "  ./euler number 1000 10 4"
+    echo "  ./euler visualize primes 500"
+fi
+
+if [ -f "euler_lite" ]; then
+    echo "  ./euler_lite complex 10000 1e-12"
+fi
+
+if [ -f "euler_basic" ]; then
+    echo "  ./euler_basic number 1000 10"
+fi

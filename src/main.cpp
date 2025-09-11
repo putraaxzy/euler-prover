@@ -10,7 +10,9 @@
 #include "complex_analysis.h"
 #include "topology.h"
 #include "progress.h"
+#ifndef NO_VISUALIZATION
 #include "visualization.h"
+#endif
 
 uint64_t mod_pow(uint64_t base, uint64_t exp, uint64_t mod) {
     uint64_t result = 1;
@@ -29,10 +31,10 @@ void print_usage(const char* prog) {
     std::cout << "+=======================================+\n\n";
     
     std::cout << "USAGE:\n";
-    std::cout << "  " << prog << " proof <mode> [options...]\n";
+    std::cout << "  " << prog << " <mode> [options...]\n";
     std::cout << "  " << prog << " visualize <mode> [options...]\n\n";
     
-    std::cout << "PROOF MODES:\n";
+    std::cout << "COMPUTATIONAL MODES:\n";
     std::cout << "  number    - Euler's theorem: a^φ(n) ≡ 1 (mod n) for gcd(a,n)=1\n";
     std::cout << "  complex   - Euler's formula: e^(iθ) = cos θ + i sin θ  \n";
     std::cout << "  topology  - Euler characteristic: V - E + F = 2 for polyhedra\n";
@@ -232,6 +234,17 @@ int main(int argc, char** argv) {
     }
     
     else if (mode == "visualize" || mode == "viz") {
+#ifdef NO_VISUALIZATION
+        std::cout << "\n+=======================================+\n";
+        std::cout << "| VISUALIZATION NOT AVAILABLE           |\n";
+        std::cout << "+=======================================+\n";
+        std::cout << "This build was compiled without visualization support.\n";
+        std::cout << "Use the computational modes instead:\n";
+        std::cout << "  " << argv[0] << " number 1000 10\n";
+        std::cout << "  " << argv[0] << " complex 10000 1e-12\n";
+        std::cout << "  " << argv[0] << " topology 4\n";
+        return 0;
+#else
         if (argc < 3) {
             std::cout << "Error: Visualization mode requires a submode\n";
             print_usage(argv[0]);
@@ -291,6 +304,7 @@ int main(int argc, char** argv) {
             visualizer.renderPrimeDistribution(limit);
             visualizer.show();
         }
+#endif
     }
     
     else if (mode == "ultra") {
