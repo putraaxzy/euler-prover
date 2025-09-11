@@ -34,8 +34,8 @@ def setup_euler_prover():
     os.chdir("euler-prover")
     
     # Make build script executable and run
-    subprocess.run(["chmod", "+x", "build_colab_optimized.sh"], check=True)
-    result = subprocess.run(["./build_colab_optimized.sh"], 
+    subprocess.run(["chmod", "+x", "build_colab.sh"], check=True)
+    result = subprocess.run(["./build_colab.sh"], 
                           capture_output=True, text=True)
     
     print("✅ Build completed!")

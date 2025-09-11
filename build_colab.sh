@@ -8,7 +8,7 @@ echo "Building high-performance mathematical computation system..."
 
 # Update system and install dependencies
 apt-get update -qq > /dev/null 2>&1
-apt-get install -y build-essential cmake libvtk9-dev libvtk9-qt-dev > /dev/null 2>&1
+apt-get install -y build-essential cmake libvtk9-dev libvtk9-qt-dev qtbase5-dev libqt5widgets5-dev > /dev/null 2>&1
 
 # Set optimal compiler flags for Colab environment
 export CC=gcc-9
