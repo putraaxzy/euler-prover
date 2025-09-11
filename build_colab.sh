@@ -42,32 +42,36 @@ if make -j$(nproc) euler 2>/dev/null; then
     echo "✓ CMake build successful"
 else
     echo "⚠ CMake build failed, using fallback compilation"
+    cd ..
     # Fallback: compile directly without VTK
     g++ $CXXFLAGS \
-        -I../include \
+        -Iinclude \
         -DVTK_FOUND=0 \
-        ../src/main.cpp ../src/number_theory.cpp ../src/complex_analysis.cpp \
-        ../src/topology.cpp ../src/progress.cpp ../src/rng.cpp \
-        -o euler
+        src/main.cpp src/number_theory.cpp src/complex_analysis.cpp \
+        src/topology.cpp src/progress.cpp src/rng.cpp \
+        -o build_colab/euler
+    cd build_colab
 fi
 
-# Create lightweight version without VTK for basic operations
+# Always create lightweight version without VTK
 echo "Creating lightweight version..."
+cd ..
 g++ $CXXFLAGS \
-    -I../include \
+    -Iinclude \
     -DVTK_FOUND=0 \
-    ../src/main.cpp ../src/number_theory.cpp ../src/complex_analysis.cpp \
-    ../src/topology.cpp ../src/progress.cpp ../src/rng.cpp \
-    -o euler_lite
+    src/main.cpp src/number_theory.cpp src/complex_analysis.cpp \
+    src/topology.cpp src/progress.cpp src/rng.cpp \
+    -o build_colab/euler_lite
 
-# Create VTK-free visualization version
-echo "Creating VTK-free visualization version..."
+# Create VTK-free visualization version (exclude visualization.cpp to avoid VTK headers)
+echo "Creating basic computation version..."
 g++ $CXXFLAGS \
-    -I../include \
-    -DVTK_FOUND=0 \
-    ../src/main.cpp ../src/number_theory.cpp ../src/complex_analysis.cpp \
-    ../src/topology.cpp ../src/progress.cpp ../src/visualization.cpp ../src/rng.cpp \
-    -o euler_viz_lite
+    -Iinclude \
+    -DVTK_FOUND=0 -DBASIC_BUILD=1 \
+    src/main.cpp src/number_theory.cpp src/complex_analysis.cpp \
+    src/topology.cpp src/progress.cpp src/rng.cpp \
+    -o build_colab/euler_basic
+cd build_colab
 
 echo "✓ Build completed successfully!"
 echo "✓ Full version: ./euler (with VTK visualization)"
