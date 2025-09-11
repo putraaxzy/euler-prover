@@ -9,6 +9,10 @@
 namespace number_theory {
     using u128 = __uint128_t;
     using i128 = __int128_t;
+
+    #ifdef __AVX2__
+    void simd_sieve_primes(std::vector<bool>& is_prime, uint64_t limit);
+    #endif
     
     class MontgomeryModulus {
         uint64_t n, r, n_inv, r_squared;
@@ -38,4 +42,15 @@ namespace number_theory {
     };
     
     EulerTestResult stress_test_euler_theorem(uint64_t max_n, size_t tests_per_n, size_t max_counterexamples = 100);
+    uint64_t mod_pow_montgomery(uint64_t base, uint64_t exp, const MontgomeryModulus& mont);
+    
+    struct BatchTestConfig {
+        uint64_t batch_size = 1000;
+        size_t num_threads = 0; 
+        bool use_montgomery = true;
+        bool enable_caching = true;
+    };
+    
+    EulerTestResult batch_test_euler_theorem(uint64_t max_n, size_t tests_per_n, 
+                                           const BatchTestConfig& config = {});
 }

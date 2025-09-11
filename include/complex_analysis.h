@@ -27,4 +27,24 @@ namespace complex_analysis {
     };
     
     ComplexBenchmark benchmark_euler_formula(size_t num_samples);
+    
+    // Riemann zeta function for visualization
+    inline Complex riemann_zeta(Complex s) {
+        // Simple implementation for visualization purposes
+        // Valid for Re(s) > 1
+        Complex sum = 0.0;
+        int max_terms = 1000;
+        
+        for (int n = 1; n <= max_terms; n++) {
+            Complex n_complex(n, 0);
+            Complex term = Complex(1.0) / std::pow(n_complex, s);
+            sum += term;
+            
+            // Early termination when terms become sufficiently small
+            if (std::abs(term) < 1e-10)
+                break;
+        }
+        
+        return sum;
+    }
 }

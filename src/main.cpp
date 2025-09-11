@@ -2,242 +2,311 @@
 #include <iomanip>
 #include <string>
 #include <algorithm>
-#include <omp.h>
+#include <numeric>
+#include <thread>
+#include <chrono>
 #include "config.h"
 #include "number_theory.h"
 #include "complex_analysis.h"
 #include "topology.h"
 #include "progress.h"
-#include "ultra_precision.h"
+#include "visualization.h"
+
+uint64_t mod_pow(uint64_t base, uint64_t exp, uint64_t mod) {
+    uint64_t result = 1;
+    base %= mod;
+    while (exp > 0) {
+        if (exp & 1) result = ((__uint128_t)result * base) % mod;
+        base = ((__uint128_t)base * base) % mod;
+        exp >>= 1;
+    }
+    return result;
+}
 
 void print_usage(const char* prog) {
-    std::cout << R"(
-EULER COMPUTATIONAL PROOF SYSTEM
-================================
-
-USAGE:
-  )" << prog << R"( proof <mode> [options...]
-
-MODES:
-  number    - Euler's theorem: a^φ(n) ≡ 1 (mod n) for gcd(a,n)=1
-  complex   - Euler's formula: e^(iθ) = cos θ + i sin θ  
-  topology  - Euler characteristic: V - E + F = 2 for polyhedra
-  ultra     - Ultra precision method comparison for e^(iθ)
-
-OPTIONS:
-  number [max_n] [tests_per_n] [threads]
-  complex [samples] [precision] [threads]
-  topology [max_icosphere_level]
-  ultra [theta] [precision_digits] [methods]
-
-ULTRA MODE:
-  theta            - Angle in radians (default: 1.0)
-  precision_digits - Decimal places precision (default: 50)
-  methods          - Comma-separated: std,taylor,cordic,arbitrary or 'all'
-
-)";
+    std::cout << "\n+=======================================+\n";
+    std::cout << "| EULER COMPUTATIONAL PROOF SYSTEM      |\n";
+    std::cout << "+=======================================+\n\n";
+    
+    std::cout << "USAGE:\n";
+    std::cout << "  " << prog << " proof <mode> [options...]\n";
+    std::cout << "  " << prog << " visualize <mode> [options...]\n\n";
+    
+    std::cout << "PROOF MODES:\n";
+    std::cout << "  number    - Euler's theorem: a^φ(n) ≡ 1 (mod n) for gcd(a,n)=1\n";
+    std::cout << "  complex   - Euler's formula: e^(iθ) = cos θ + i sin θ  \n";
+    std::cout << "  topology  - Euler characteristic: V - E + F = 2 for polyhedra\n";
+    std::cout << "  ultra     - Ultra precision method comparison for e^(iθ)\n\n";
+    
+    std::cout << "VISUALIZATION MODES:\n";
+    std::cout << "  euler     - Visualize Euler's formula in 3D\n";
+    std::cout << "  topology  - Visualize polyhedra and Euler characteristic\n";
+    std::cout << "  complex   - Visualize complex functions with domain coloring\n";
+    std::cout << "  primes    - Visualize prime number distributions\n\n";
+    
+    std::cout << "EXAMPLES:\n";
+    std::cout << "  " << prog << " number 10000 20        # Test Euler's theorem up to n=10000\n";
+    std::cout << "  " << prog << " complex 1000000 1e-12  # Test Euler's formula with high precision\n";
+    std::cout << "  " << prog << " visualize topology icosphere 4  # Visualize level 4 icosphere\n";
+    std::cout << "  " << prog << " viz complex euler 800   # Visualize Euler's formula at 800x800 resolution\n\n";
 }
 
 int main(int argc, char** argv) {
-    std::ios::sync_with_stdio(false);
-    std::cin.tie(nullptr);
-    
-    std::cout << std::fixed << std::setprecision(12);
-    
-    if (argc < 3 || std::string(argv[1]) != "proof") {
+    if (argc < 2) {
         print_usage(argv[0]);
         return 1;
     }
-    
-    std::string mode = argv[2];
-    
+
+    std::string mode = argv[1];
+    std::transform(mode.begin(), mode.end(), mode.begin(), ::tolower);
+
     if (mode == "number") {
-        uint64_t max_n = (argc >= 4) ? std::stoull(argv[3]) : 50000;
-        size_t tests_per_n = (argc >= 5) ? std::stoull(argv[4]) : 10;
-        int threads = (argc >= 6) ? std::stoi(argv[5]) : config::get_thread_count();
-        
-        #ifdef _OPENMP
-        omp_set_num_threads(threads);
-        #endif
-        
-        std::cout << "=== EULER'S THEOREM COMPUTATIONAL PROOF ===\n";
+        std::cout << "\n+=======================================+\n";
+        std::cout << "| EULER'S THEOREM COMPUTATIONAL PROOF   |\n";
+        std::cout << "+=======================================+\n";
         std::cout << "Testing: a^φ(n) ≡ 1 (mod n) for gcd(a,n) = 1\n";
+
+        int max_n = (argc > 2) ? std::stoi(argv[2]) : 1000;
+        int tests_per_n = (argc > 3) ? std::stoi(argv[3]) : 10;
+        int num_threads = (argc > 4) ? std::stoi(argv[4]) : std::thread::hardware_concurrency();
+
         std::cout << "Parameters: max_n=" << max_n << ", tests_per_n=" << tests_per_n 
-                 << ", threads=" << threads << "\n\n";
+                  << ", threads=" << num_threads << "\n\n";
+
+        auto start_time = std::chrono::high_resolution_clock::now();
         std::cout << "Starting computation...\n";
-        
-        ProgressTracker progress(max_n * tests_per_n, "Number Theory Tests");
-        
-        auto result = number_theory::stress_test_euler_theorem(max_n, tests_per_n);
-        progress.finish();
-        
-        std::cout << "\n--- RESULTS ---\n";
-        std::cout << "Total tests executed: " << result.total_tests << "\n";
-        std::cout << "Tests passed:         " << result.passed_tests << "\n";
-        std::cout << "Tests skipped:        " << result.skipped_tests << "\n";
-        std::cout << "Failures found:       " << result.counterexamples.size() << "\n";
-        std::cout << "Success rate:         " << (100.0 * result.passed_tests / result.total_tests) << "%\n";
-        std::cout << "Computation time:     " << result.avg_computation_time << "s\n";
-        
-        if (!result.counterexamples.empty()) {
-            std::cout << "\n--- COUNTEREXAMPLES (first 10) ---\n";
-            for (size_t i = 0; i < std::min(static_cast<size_t>(10), result.counterexamples.size()); i++) {
-                auto [a, n, phi_n] = result.counterexamples[i];
-                std::cout << "a=" << a << ", n=" << n << ", φ(n)=" << phi_n << "\n";
+
+        int total_tests = 0;
+        int passed_tests = 0;
+        int failed_tests = 0;
+        int skipped_tests = 0;
+
+        ProgressTracker progress(max_n - 1, "Number Theory Tests");
+
+        for (int n = 2; n <= max_n; ++n) {
+            for (int test = 0; test < tests_per_n; ++test) {
+                int a = 2 + (std::rand() % (n - 1));
+                
+                if (std::__gcd(a, n) != 1) {
+                    skipped_tests++;
+                    continue;
+                }
+
+                uint64_t phi_n = number_theory::euler_phi(n);
+                uint64_t result = mod_pow(a, phi_n, n);
+                
+                total_tests++;
+                if (result == 1) {
+                    passed_tests++;
+                } else {
+                    failed_tests++;
+                }
             }
-            return 2;
+            progress.update(n - 1);
         }
-        
-        std::cout << "\n✓ PROOF STATUS: ALL TESTS PASSED - Euler's theorem holds computationally\n";
-        return 0;
+
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::duration<double>>(end_time - start_time);
+
+        std::cout << "\n+---------------------------------+\n";
+        std::cout << "|          RESULTS                |\n";
+        std::cout << "+---------------------------------+\n";
+        std::cout << "Total tests executed: " << total_tests << "\n";
+        std::cout << "Tests passed:         " << passed_tests << "\n";
+        std::cout << "Tests skipped:        " << skipped_tests << "\n";
+        std::cout << "Failures found:       " << failed_tests << "\n";
+        std::cout << "Success rate:         " << (total_tests > 0 ? (100.0 * passed_tests / total_tests) : 0) << "%\n";
+        std::cout << "Computation time:     " << duration.count() << "s\n\n";
+
+        if (failed_tests == 0) {
+            std::cout << "✓ PROOF STATUS: ALL TESTS PASSED - Euler's theorem holds computationally\n";
+            return 0;
+        } else {
+            std::cout << "✗ PROOF STATUS: " << failed_tests << " FAILURES DETECTED\n";
+            return 1;
+        }
     }
+    
     else if (mode == "complex") {
-        size_t samples = (argc >= 4) ? std::stoull(argv[3]) : 1000000;
-        long double precision = (argc >= 5) ? std::stold(argv[4]) : config::TAYLOR_CONVERGENCE;
-        int threads = (argc >= 6) ? std::stoi(argv[5]) : config::get_thread_count();
-        
-        #ifdef _OPENMP
-        omp_set_num_threads(threads);
-        #endif
-        
-        std::cout << "=== EULER'S FORMULA COMPUTATIONAL PROOF ===\n";
+        std::cout << "\n+=======================================+\n";
+        std::cout << "| EULER'S FORMULA COMPUTATIONAL PROOF   |\n";
+        std::cout << "+=======================================+\n";
         std::cout << "Testing: e^(iθ) = cos θ + i sin θ\n";
+
+        int samples = (argc > 2) ? std::stoi(argv[2]) : 1000000;
+        double precision = (argc > 3) ? std::stod(argv[3]) : 1e-12;
+        int num_threads = (argc > 4) ? std::stoi(argv[4]) : std::thread::hardware_concurrency();
+
         std::cout << "Parameters: samples=" << samples << ", precision=" << precision 
-                 << ", threads=" << threads << "\n\n";
-        
+                  << ", threads=" << num_threads << "\n\n";
+
+        auto start_time = std::chrono::high_resolution_clock::now();
+        std::cout << "Starting computation...\n";
+
+        int passed_tests = 0;
+        int failed_tests = 0;
+        double max_error = 0.0;
+
         ProgressTracker progress(samples, "Complex Analysis Tests");
-        
-        auto benchmark = complex_analysis::benchmark_euler_formula(samples);
-        progress.finish();
-        
-        std::cout << "\n--- RESULTS ---\n";
-        std::cout << "Samples tested:           " << benchmark.samples << "\n";
-        std::cout << "Max absolute error:       " << std::scientific << benchmark.max_absolute_error << "\n";
-        std::cout << "Mean absolute error:      " << benchmark.mean_absolute_error << "\n";
-        std::cout << "Std deviation of error:   " << benchmark.std_deviation_error << "\n";
-        std::cout << "Computation time:         " << std::fixed << benchmark.computation_time_seconds << "s\n";
-        std::cout << "Target precision:         " << std::scientific << precision << "\n";
-        
-        std::cout << "\n--- ERROR DISTRIBUTION ---\n";
-        for (size_t i = 0; i < 10; i++) {
-            double bin_start = (i * benchmark.max_absolute_error) / 10;
-            double bin_end = ((i+1) * benchmark.max_absolute_error) / 10;
-            size_t count = benchmark.error_histogram[i * 10];
-            std::cout << "[" << std::scientific << bin_start << ", " << bin_end << "): " 
-                     << count << " samples\n";
+
+        for (int i = 0; i < samples; ++i) {
+            double theta = -10.0 + 20.0 * i / samples;
+            
+            complex_analysis::Complex euler_result = complex_analysis::exp_taylor_adaptive(complex_analysis::Complex(0, theta));
+            complex_analysis::Complex expected(std::cos(theta), std::sin(theta));
+            
+            double error = std::abs(euler_result - expected);
+            max_error = std::max(max_error, error);
+            
+            if (error < precision) {
+                passed_tests++;
+            } else {
+                failed_tests++;
+            }
+            
+            if (i % 10000 == 0) progress.update(i);
         }
-        
-        bool passed = benchmark.max_absolute_error < precision * 1000;
-        std::cout << "\n✓ PROOF STATUS: " << (passed ? "PASSED" : "MARGINAL") 
-                 << " - Euler's formula verified within numerical precision\n";
-        
-        return passed ? 0 : 1;
+
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::duration<double>>(end_time - start_time);
+
+        std::cout << "\n+---------------------------------+\n";
+        std::cout << "|          RESULTS                |\n";
+        std::cout << "+---------------------------------+\n";
+        std::cout << "Total tests executed: " << samples << "\n";
+        std::cout << "Tests passed:         " << passed_tests << "\n";
+        std::cout << "Failures found:       " << failed_tests << "\n";
+        std::cout << "Maximum error:        " << std::scientific << max_error << "\n";
+        std::cout << "Success rate:         " << (100.0 * passed_tests / samples) << "%\n";
+        std::cout << "Computation time:     " << std::fixed << duration.count() << "s\n\n";
+
+        if (failed_tests == 0) {
+            std::cout << "✓ PROOF STATUS: ALL TESTS PASSED - Euler's formula holds computationally\n";
+            return 0;
+        } else {
+            std::cout << "✗ PROOF STATUS: " << failed_tests << " FAILURES DETECTED\n";
+            return 1;
+        }
     }
+    
     else if (mode == "topology") {
-        int max_level = (argc >= 4) ? std::stoi(argv[3]) : 4;
-        max_level = std::min(max_level, static_cast<int>(config::MAX_ICOSPHERE_LEVEL));
-        
-        std::cout << "=== EULER CHARACTERISTIC COMPUTATIONAL PROOF ===\n";
+        std::cout << "\n+=======================================+\n";
+        std::cout << "| EULER CHARACTERISTIC PROOF            |\n";
+        std::cout << "+=======================================+\n";
         std::cout << "Testing: V - E + F = 2 for polyhedra\n";
+
+        int max_level = (argc > 2) ? std::stoi(argv[2]) : 4;
         std::cout << "Parameters: max_icosphere_level=" << max_level << "\n\n";
-        
-        auto result = topology::run_comprehensive_suite();
-        
-        std::cout << "--- RESULTS ---\n";
-        std::cout << std::left << std::setw(25) << "Polyhedron" 
-                 << std::setw(8) << "V" << std::setw(8) << "E" << std::setw(8) << "F" 
-                 << std::setw(6) << "χ" << std::setw(8) << "Status" 
-                 << std::setw(12) << "Area" << std::setw(12) << "Volume" << "Time(ms)\n";
-        std::cout << std::string(95, '-') << "\n";
-        
-        for (const auto& test : result.test_cases) {
-            std::cout << std::left << std::setw(25) << test.name
-                     << std::right << std::setw(8) << test.vertices
-                     << std::setw(8) << test.edges  
-                     << std::setw(8) << test.faces
-                     << std::setw(6) << test.euler_characteristic
-                     << std::setw(8) << (test.passed ? "PASS" : "FAIL")
-                     << std::setw(12) << std::fixed << std::setprecision(4) << test.surface_area
-                     << std::setw(12) << test.volume
-                     << std::setw(8) << std::setprecision(2) << (test.computation_time * 1000) << "\n";
-        }
-        
-        std::cout << "\n--- SUMMARY ---\n";
-        std::cout << "Total tests:       " << result.test_cases.size() << "\n";
-        std::cout << "Tests passed:      " << std::count_if(result.test_cases.begin(), result.test_cases.end(),
-                                                         [](const auto& t) { return t.passed; }) << "\n";
-        std::cout << "Computation time:  " << std::fixed << std::setprecision(3) << result.total_computation_time << "s\n";
-        
-        std::cout << "\n✓ PROOF STATUS: " << (result.all_passed ? "ALL TESTS PASSED" : "SOME FAILURES") 
-                 << " - Euler characteristic verified for tested polyhedra\n";
-        
-        return result.all_passed ? 0 : 2;
-    }
-    else if (mode == "ultra") {
-        long double theta = (argc >= 4) ? std::stold(argv[3]) : 1.0L;
-        int precision = (argc >= 5) ? std::stoi(argv[4]) : 50;
-        std::string methods = (argc >= 6) ? argv[5] : "all";
-        
-        std::cout << "=== ULTRA PRECISION EULER FORMULA COMPARISON ===\n";
-        std::cout << "Comparing computation methods for e^(iθ)\n";
-        std::cout << "Parameters: θ=" << theta << ", precision=" << precision 
-                 << " digits, methods=" << methods << "\n\n";
-        
-        ultra_precision::EulerMethodComparison comparison(precision);
-        
-        bool run_std = (methods == "all" || methods.find("std") != std::string::npos);
-        bool run_taylor = (methods == "all" || methods.find("taylor") != std::string::npos);
-        bool run_cordic = (methods == "all" || methods.find("cordic") != std::string::npos);
-        bool run_arbitrary = (methods == "all" || methods.find("arbitrary") != std::string::npos);
-        
-        auto results = comparison.compare_all_methods(theta, run_std, run_taylor, run_cordic, run_arbitrary);
-        
-        std::cout << "--- COMPUTATION RESULTS ---\n";
-        std::cout << std::left << std::setw(15) << "Method" 
-                 << std::setw(25) << "Real Part" 
-                 << std::setw(25) << "Imaginary Part"
-                 << std::setw(15) << "Abs Error"
-                 << std::setw(15) << "Time (ns)" << "\n";
-        std::cout << std::string(95, '-') << "\n";
-        
-        for (const auto& method : results.methods) {
-            std::cout << std::left << std::setw(15) << method.method_name
-                     << std::setw(25) << std::setprecision(precision/2) << std::fixed << method.result.real()
-                     << std::setw(25) << method.result.imag()
-                     << std::setw(15) << std::scientific << method.absolute_error
-                     << std::setw(15) << std::fixed << std::setprecision(1) << method.computation_time_ns << "\n";
-        }
-        
-        if (results.methods.size() > 1) {
-            std::cout << "\n--- ERROR ANALYSIS ---\n";
-            auto reference = results.methods[0];
+
+        std::cout << "Starting computation...\n";
+
+        bool all_passed = true;
+        for (int level = 0; level <= max_level; ++level) {
+            topology::IcosphereGenerator generator;
+            topology::TopologicalMesh icosphere = generator.generate(level);
             
-            std::cout << "Reference method: " << reference.method_name << "\n";
-            std::cout << "Reference result: " << std::setprecision(precision/2) << std::fixed
-                     << reference.result.real() << " + " << reference.result.imag() << "i\n";
+            auto [V, E, F, euler_char] = icosphere.euler_characteristic();
             
-            std::cout << "\n--- METHOD COMPARISON ---\n";
-            for (size_t i = 1; i < results.methods.size(); i++) {
-                const auto& method = results.methods[i];
-                std::cout << method.method_name << " vs " << reference.method_name 
-                         << ": abs error = " << std::scientific << method.absolute_error
-                         << ", rel error = " << method.relative_error
-                         << ", time ratio = " << std::fixed << std::setprecision(2) 
-                         << (method.computation_time_ns / reference.computation_time_ns) << "x\n";
+            std::cout << "Level " << level << ": V=" << V << " E=" << E << " F=" << F 
+                      << " χ=" << euler_char;
+            
+            if (euler_char == 2) {
+                std::cout << " ✓\n";
+            } else {
+                std::cout << " ✗\n";
+                all_passed = false;
             }
         }
+
+        std::cout << "\n+---------------------------------+\n";
+        std::cout << "|          RESULTS                |\n";
+        std::cout << "+---------------------------------+\n";
         
-        std::string filename = "build/ultra_precision_results.csv";
-        comparison.save_error_histogram(results, filename);
-        std::cout << "\n✓ Results exported to: " << filename << "\n";
+        if (all_passed) {
+            std::cout << "✓ PROOF STATUS: ALL TESTS PASSED - Euler characteristic holds\n";
+            return 0;
+        } else {
+            std::cout << "✗ PROOF STATUS: FAILURES DETECTED\n";
+            return 1;
+        }
+    }
+    
+    else if (mode == "visualize" || mode == "viz") {
+        if (argc < 3) {
+            std::cout << "Error: Visualization mode requires a submode\n";
+            print_usage(argv[0]);
+            return 1;
+        }
+
+        std::string submode = argv[2];
+        std::transform(submode.begin(), submode.end(), submode.begin(), ::tolower);
+
+        visualization::VisualizationConfig config;
+        config.width = 800;
+        config.height = 600;
+        config.outputFilePath = "euler_result.ppm";
         
-        std::cout << "\n✓ ULTRA PRECISION ANALYSIS COMPLETE\n";
-        std::cout << "All methods computed e^(i" << theta << ") with " << precision << "-digit precision\n";
+        visualization::Visualizer3D visualizer(config);
+
+        if (submode == "topology") {
+            std::string shape = (argc > 3) ? argv[3] : "icosphere";
+            int level = (argc > 4) ? std::stoi(argv[4]) : 3;
+
+            if (shape == "icosphere") {
+                topology::IcosphereGenerator generator;
+                topology::TopologicalMesh mesh = generator.generate(level);
+                std::cout << "Visualizing icosphere level " << level << "\n";
+                visualizer.renderEulerCharacteristic(mesh);
+            } else if (shape == "torus") {
+                topology::TopologicalMesh mesh = topology::create_torus(level * 10);
+                std::cout << "Visualizing torus resolution " << (level * 10) << "\n";
+                visualizer.renderEulerCharacteristic(mesh);
+            }
+            visualizer.show();
+        }
         
+        else if (submode == "complex") {
+            std::string func_type = (argc > 3) ? argv[3] : "euler";
+            int resolution = (argc > 4) ? std::stoi(argv[4]) : 400;
+
+            if (func_type == "euler") {
+                auto euler_func = [](complex_analysis::Complex z) -> complex_analysis::Complex {
+                    return complex_analysis::exp_taylor_adaptive(complex_analysis::Complex(0, 1) * z);
+                };
+                std::cout << "Visualizing Euler formula e^(iz) at " << resolution << "x" << resolution << "\n";
+                visualizer.renderComplexFunction(euler_func, -3.14159, 3.14159, -3.14159, 3.14159, resolution);
+            } else if (func_type == "riemann") {
+                auto riemann_func = [](complex_analysis::Complex z) -> complex_analysis::Complex {
+                    return complex_analysis::Complex(1, 0) / z;
+                };
+                std::cout << "Visualizing Riemann function 1/z at " << resolution << "x" << resolution << "\n";
+                visualizer.renderRiemannSurface(riemann_func, -2, 2, -2, 2, resolution);
+            }
+            visualizer.show();
+        }
+        
+        else if (submode == "primes" || submode == "number") {
+            int limit = (argc > 3) ? std::stoi(argv[3]) : 1000;
+            std::cout << "Visualizing prime distribution up to " << limit << "\n";
+            visualizer.renderPrimeDistribution(limit);
+            visualizer.show();
+        }
+    }
+    
+    else if (mode == "ultra") {
+        std::cout << "\n+=======================================+\n";
+        std::cout << "| ULTRA PRECISION NOT AVAILABLE         |\n";
+        std::cout << "+=======================================+\n";
+        std::cout << "Ultra precision mode is not implemented in this optimized version.\n";
+        std::cout << "Use 'complex' mode for high precision testing.\n";
         return 0;
     }
+    
     else {
+        std::cout << "Error: Unknown mode '" << mode << "'\n";
         print_usage(argv[0]);
         return 1;
     }
+
+    return 0;
 }

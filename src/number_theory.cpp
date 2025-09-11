@@ -6,26 +6,51 @@
 #include <numeric>
 #include <map>
 #include <iostream>
+#include <execution>
+#include <thread>
+#include <mutex>
+#include <atomic>
+#include <immintrin.h>
+#include <unordered_map>
 
 namespace number_theory {
-
-// Simple modular exponentiation without Montgomery
 uint64_t mod_pow(uint64_t base, uint64_t exp, uint64_t mod) {
+    if (mod == 1) return 0;
+    if (exp == 0) return 1;
+    
     uint64_t result = 1;
     base %= mod;
+    
     while (exp > 0) {
-        if (exp & 1) result = ((__uint128_t)result * base) % mod;
+        if (exp & 1) {
+            result = ((__uint128_t)result * base) % mod;
+        }
         base = ((__uint128_t)base * base) % mod;
         exp >>= 1;
     }
     return result;
 }
 
+uint64_t mod_pow_montgomery(uint64_t base, uint64_t exp, const MontgomeryModulus& mont) {
+    if (exp == 0) return mont.to_montgomery(1);
+    
+    uint64_t result = mont.to_montgomery(1);
+    uint64_t base_mont = mont.to_montgomery(base);
+    
+    while (exp > 0) {
+        if (exp & 1) {
+            result = mont.multiply(result, base_mont);
+        }
+        base_mont = mont.multiply(base_mont, base_mont);
+        exp >>= 1;
+    }
+    return mont.from_montgomery(result);
+}
+
 MontgomeryModulus::MontgomeryModulus(uint64_t modulus) : n(modulus) {
     bits = 64 - __builtin_clzll(n);
     r = 1ULL << bits;
     
-    // Iterative extended GCD to avoid recursion issues
     i128 old_r = r, r_val = n;
     i128 old_s = 1, s = 0;
     
@@ -179,14 +204,35 @@ std::map<uint64_t, int> factorize_advanced(uint64_t n) {
 uint64_t euler_phi(uint64_t n) {
     if (n == 0) return 0;
     if (n == 1) return 1;
+    if (n == 2) return 1;
     
-    auto factors = factorize_advanced(n);
-    uint64_t result = n;
+    static thread_local std::map<uint64_t, uint64_t> phi_cache;
     
-    for (auto [p, k] : factors) {
-        result = result / p * (p - 1);
+    auto it = phi_cache.find(n);
+    if (it != phi_cache.end()) {
+        return it->second;
     }
     
+    uint64_t result = n;
+    uint64_t temp_n = n;
+    
+    if (temp_n % 2 == 0) {
+        result /= 2;
+        while (temp_n % 2 == 0) temp_n /= 2;
+    }
+    
+    for (uint64_t i = 3; i * i <= temp_n; i += 2) {
+        if (temp_n % i == 0) {
+            result = result / i * (i - 1);
+            while (temp_n % i == 0) temp_n /= i;
+        }
+    }
+    
+    if (temp_n > 1) {
+        result = result / temp_n * (temp_n - 1);
+    }
+    
+    phi_cache[n] = result;
     return result;
 }
 
@@ -214,41 +260,188 @@ uint64_t carmichael_lambda(uint64_t n) {
 
 EulerTestResult stress_test_euler_theorem(uint64_t max_n, size_t tests_per_n, size_t max_counterexamples) {
     EulerTestResult result;
-    SecureRNG rng;
     auto start_time = std::chrono::high_resolution_clock::now();
     
-    // Simple sequential version - works reliably
-    for (uint64_t n = 2; n <= max_n; n++) {
-        result.modulus_distribution[n]++;
-        
-        for (size_t t = 0; t < tests_per_n; t++) {
-            // Skip cases where we can't generate valid 'a' in range [2, n-1]
-            if (n <= 2) {
-                result.skipped_tests++;
-                continue;
-            }
+    const size_t num_threads = std::min(static_cast<size_t>(std::thread::hardware_concurrency()), static_cast<size_t>(8));
+    const size_t chunk_size = std::max(static_cast<size_t>(1), (max_n - 1) / num_threads);
+    
+    std::vector<std::thread> threads;
+    std::mutex result_mutex;
+    std::atomic<size_t> total_tests{0}, passed_tests{0}, skipped_tests{0};
+    std::vector<std::tuple<uint64_t, uint64_t, uint64_t>> counterexamples;
+    
+    for (size_t thread_id = 0; thread_id < num_threads; ++thread_id) {
+        threads.emplace_back([&, thread_id]() {
+            SecureRNG rng(thread_id + 1);
+            std::vector<std::tuple<uint64_t, uint64_t, uint64_t>> local_counterexamples;
             
-            uint64_t a = rng.uniform(static_cast<uint64_t>(2), n - 1);
+            uint64_t start_n = 2 + thread_id * chunk_size;
+            uint64_t end_n = std::min(max_n + 1, start_n + chunk_size);
             
-            if (std::__gcd(a, n) != 1) {
-                result.skipped_tests++;
-                continue;
-            }
+            std::map<uint64_t, uint64_t> phi_cache;
             
-            result.total_tests++;
-            
-            uint64_t phi_n = euler_phi(n);
-            uint64_t result_val = mod_pow(a, phi_n, n);
-            
-            if (result_val == 1) {
-                result.passed_tests++;
-            } else {
-                if (result.counterexamples.size() < max_counterexamples) {
-                    result.counterexamples.emplace_back(a, n, phi_n);
+            for (uint64_t n = start_n; n < end_n; ++n) {
+                if (phi_cache.find(n) == phi_cache.end()) {
+                    phi_cache[n] = euler_phi(n);
                 }
+                
+                MontgomeryModulus mont(n);
+                
+                for (size_t t = 0; t < tests_per_n; ++t) {
+                    if (n <= 2) {
+                        skipped_tests++;
+                        continue;
+                    }
+                    
+                    uint64_t a = rng.uniform(static_cast<uint64_t>(2), n - 1);
+                    
+                    if (std::__gcd(a, n) != 1) {
+                        skipped_tests++;
+                        continue;
+                    }
+                    
+                    total_tests++;
+                    
+                    uint64_t phi_n = phi_cache[n];
+                    uint64_t result_val = mod_pow_montgomery(a, phi_n, mont);
+                    
+                    if (result_val == 1) {
+                        passed_tests++;
+                    } else {
+                        if (local_counterexamples.size() < max_counterexamples / num_threads) {
+                            local_counterexamples.emplace_back(a, n, phi_n);
+                        }
+                    }
+                }
+            }
+            
+            std::lock_guard<std::mutex> lock(result_mutex);
+            counterexamples.insert(counterexamples.end(), local_counterexamples.begin(), local_counterexamples.end());
+        });
+    }
+    
+    for (auto& thread : threads) {
+        thread.join();
+    }
+    
+    result.total_tests = total_tests.load();
+    result.passed_tests = passed_tests.load();
+    result.skipped_tests = skipped_tests.load();
+    result.counterexamples = std::move(counterexamples);
+    
+    auto end_time = std::chrono::high_resolution_clock::now();
+    result.avg_computation_time = std::chrono::duration<double>(end_time - start_time).count();
+    
+    return result;
+}
+
+#ifdef __AVX2__
+void simd_sieve_primes(std::vector<bool>& is_prime, uint64_t limit) {
+    if (limit < 2) return;
+    
+    is_prime.assign(limit + 1, true);
+    is_prime[0] = is_prime[1] = false;
+    
+    for (uint64_t i = 2; i * i <= limit; ++i) {
+        if (is_prime[i]) {
+            for (uint64_t j = i * i; j <= limit; j += i) {
+                is_prime[j] = false;
             }
         }
     }
+}
+#endif
+
+EulerTestResult batch_test_euler_theorem(uint64_t max_n, size_t tests_per_n, const BatchTestConfig& config) {
+    EulerTestResult result;
+    auto start_time = std::chrono::high_resolution_clock::now();
+    
+    size_t num_threads = config.num_threads;
+    if (num_threads == 0) {
+        num_threads = std::min(static_cast<size_t>(std::thread::hardware_concurrency()), static_cast<size_t>(16));
+    }
+    
+    const uint64_t total_range = max_n - 1;
+    const uint64_t batch_size = std::min(config.batch_size, total_range / num_threads + 1);
+    
+    std::vector<std::thread> threads;
+    std::mutex result_mutex;
+    std::atomic<size_t> total_tests{0}, passed_tests{0}, skipped_tests{0};
+    std::vector<std::tuple<uint64_t, uint64_t, uint64_t>> counterexamples;
+    
+    std::atomic<uint64_t> current_batch{2};
+    
+    for (size_t thread_id = 0; thread_id < num_threads; ++thread_id) {
+        threads.emplace_back([&, thread_id]() {
+            SecureRNG rng(thread_id * 12345 + 67890);
+            std::vector<std::tuple<uint64_t, uint64_t, uint64_t>> local_counterexamples;
+            
+            std::unordered_map<uint64_t, uint64_t> phi_cache;
+            std::unordered_map<uint64_t, std::unique_ptr<MontgomeryModulus>> mont_cache;
+            
+            while (true) {
+                uint64_t batch_start = current_batch.fetch_add(batch_size);
+                if (batch_start > max_n) break;
+                
+                uint64_t batch_end = std::min(batch_start + batch_size, max_n + 1);
+                
+                for (uint64_t n = batch_start; n < batch_end; ++n) {
+                    if (config.enable_caching && phi_cache.find(n) == phi_cache.end()) {
+                        phi_cache[n] = euler_phi(n);
+                    }
+                    
+                    if (config.use_montgomery && mont_cache.find(n) == mont_cache.end()) {
+                        mont_cache[n] = std::make_unique<MontgomeryModulus>(n);
+                    }
+                    
+                    for (size_t t = 0; t < tests_per_n; ++t) {
+                        if (n <= 2) {
+                            skipped_tests++;
+                            continue;
+                        }
+                        
+                        uint64_t a = rng.uniform(static_cast<uint64_t>(2), n - 1);
+                        
+                        if (std::__gcd(a, n) != 1) {
+                            skipped_tests++;
+                            continue;
+                        }
+                        
+                        total_tests++;
+                        
+                        uint64_t phi_n = config.enable_caching ? phi_cache[n] : euler_phi(n);
+                        uint64_t result_val;
+                        
+                        if (config.use_montgomery && mont_cache[n]) {
+                            result_val = mod_pow_montgomery(a, phi_n, *mont_cache[n]);
+                        } else {
+                            result_val = mod_pow(a, phi_n, n);
+                        }
+                        
+                        if (result_val == 1) {
+                            passed_tests++;
+                        } else {
+                            if (local_counterexamples.size() < 100) {
+                                local_counterexamples.emplace_back(a, n, phi_n);
+                            }
+                        }
+                    }
+                }
+            }
+            
+            std::lock_guard<std::mutex> lock(result_mutex);
+            counterexamples.insert(counterexamples.end(), local_counterexamples.begin(), local_counterexamples.end());
+        });
+    }
+    
+    for (auto& thread : threads) {
+        thread.join();
+    }
+    
+    result.total_tests = total_tests.load();
+    result.passed_tests = passed_tests.load();
+    result.skipped_tests = skipped_tests.load();
+    result.counterexamples = std::move(counterexamples);
     
     auto end_time = std::chrono::high_resolution_clock::now();
     result.avg_computation_time = std::chrono::duration<double>(end_time - start_time).count();

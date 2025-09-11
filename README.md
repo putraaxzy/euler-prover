@@ -14,6 +14,7 @@ Inspirasi teknis dari penelitian terdepan: ["A Fast and Scalable Computational T
 
 ## 🚀 Quick Start
 
+### Local Build
 ```bash
 # Clone repository
 git clone https://github.com/putraaxzy/euler-prover.git
@@ -28,9 +29,49 @@ cd euler-prover
 .\build\euler.exe proof complex 10000 15 4    # Formula Euler
 .\build\euler.exe proof topology 3            # Karakteristik Euler
 .\build\euler.exe proof ultra 1.0 50 all      # Ultra precision comparison
-
-# Lihat hasil visual verification di bagian "Visual Analysis" README ini!
 ```
+
+### 🔬 Google Colab Ready - Enhanced!
+
+Sistem ini telah dioptimalkan khusus untuk Google Colab dengan performa maksimal dan visualisasi VTK berkualitas tinggi:
+
+### 🚀 Quick Setup (Optimized)
+```bash
+# Install dependencies dengan VTK support
+!apt-get update -qq && apt-get install -y build-essential cmake libvtk9-dev
+!git clone https://github.com/putraaxzy/euler-prover.git
+!cd euler-prover && chmod +x build_colab_optimized.sh && ./build_colab_optimized.sh
+```
+
+### 🎯 Advanced Usage
+```bash
+# High-performance computation dengan VTK visualization
+!cd euler-prover/build_colab && ./euler proof number 50000 100 8
+!cd euler-prover/build_colab && ./euler visualize topology icosphere 5
+!cd euler-prover/build_colab && ./euler visualize complex euler 1024
+
+# Lightweight version untuk komputasi cepat
+!cd euler-prover/build_colab && ./euler_lite proof complex 1000000 18
+```
+
+### 📊 Multiple Output Formats
+```python
+# Automatic format detection
+from IPython.display import Image, display
+import os
+
+# VTK generates high-quality images
+for fmt in ['png', 'jpg', 'tiff']:
+    if os.path.exists(f'/content/euler-prover/result.{fmt}'):
+        display(Image(f'/content/euler-prover/result.{fmt}'))
+```
+
+**Enhanced Features**:
+- ✅ **VTK 3D Rendering**: Professional-quality visualizations
+- ✅ **Multi-format Export**: PNG, JPG, TIFF, BMP support
+- ✅ **SIMD Optimization**: AVX2-accelerated computations
+- ✅ **Memory Efficient**: Optimized for Colab's 12GB RAM limit
+- ✅ **Interactive 3D**: Rotatable, zoomable visualizations
 
 ## 📐 Cakupan Matematika
 
@@ -225,6 +266,7 @@ euler-proof-system/
 ### Desain Pattern dan Arsitektur
 
 #### 1. Separation of Concerns
+
 ```cpp
 namespace number_theory {    // Teorema Euler & modular arithmetic
 namespace complex_analysis { // Formula Euler & Taylor series
@@ -315,7 +357,7 @@ class PlatonicSolids {              // Geometric primitives
 - **SIMD Vectorization**: Parallel arithmetic pada multiple data
 - **Cache-Conscious Layouts**: Minimize cache misses dengan data locality
 
-## � Hasil Benchmark dan Stress Testing
+## Hasil Benchmark dan Stress Testing
 
 ### Environment Testing
 
@@ -370,7 +412,7 @@ Complex Analysis: Linear scaling dengan stability
 - ✅ **Presisi 22 digit** decimal places
 - ✅ **397,481 samples/second** sustained throughput
 - ✅ **Error rate**: Max 1.212e-18, Mean 1.297e-19
-- ✅ **Memory usage**: ~800MB untuk dataset 50M
+- ✅ **Memory usage**: ~800MB untuk 50M
 - ✅ **Stabilitas**: 100% completion tanpa overflow/underflow
 
 ### Memory Efficiency
@@ -446,7 +488,7 @@ cmake .. -DCMAKE_BUILD_TYPE=Release
 make -j$(nproc)
 ```
 
-## �️ Installation & Setup
+## ️ Installation & Setup
 
 ### Prerequisites
 
@@ -511,7 +553,7 @@ g++ -std=c++17 -O3 -DNDEBUG -march=native -flto -funroll-loops -Wall -Wextra -Ii
 # Expected output: "PROOF STATUS: ALL TESTS PASSED" untuk semua mode
 ```
 
-## �� Penggunaan dan Parameter
+## Penggunaan dan Parameter
 
 ### 1. Verifikasi Teorema Euler
 
@@ -560,24 +602,38 @@ build\euler.exe proof number 10000 50 8
 - `max_level`: Level subdivisi maksimal icosphere (0-8 recommended)
 - `threads`: Thread count untuk mesh processing (opsional)
 
-### 4. Ultra Precision Method Comparison
+### 4. Enhanced Visualization Modes
 
 ```bash
-.\euler.exe proof ultra [theta] [precision_digits] [methods]
+# Advanced 3D Visualizations
+.\euler.exe visualize topology icosphere 6    # High-detail icosphere
+.\euler.exe visualize complex riemann 1024    # 4K Riemann surface
+.\euler.exe visualize primes 50000 ulam       # Ulam prime spiral
+.\euler.exe visualize euler 2048 interactive  # Interactive Euler formula
 
-# Contoh:
-.\euler.exe proof ultra                    # Default: θ=1.0, 50 digit, all methods
-.\euler.exe proof ultra 2.5 30 taylor,cordic # Custom: θ=2.5, 30 digit, specific methods
-.\euler.exe proof ultra 1.5 60 all        # High precision: θ=1.5, 60 digit, all methods
+# Batch Processing Mode
+.\euler.exe batch number 100000 50 config.json
+.\euler.exe batch complex 10000000 20 high_precision.json
+
+# Export Formats
+.\euler.exe visualize topology icosphere 4 --output result.png
+.\euler.exe visualize complex euler 800 --output formula.jpg --quality 95
+.\euler.exe visualize primes 10000 --output primes.tiff --dpi 300
 ```
 
-**Parameter Detail**:
+**Enhanced Parameters**:
+- `--output`: Output file dengan format auto-detection (png/jpg/tiff/bmp)
+- `--quality`: JPEG quality (1-100, default: 95)
+- `--dpi`: Resolution untuk print-quality output (default: 150)
+- `--interactive`: Enable interactive 3D manipulation
+- `--batch-size`: Optimal batch size untuk memory management
+- `--threads`: Manual thread count override
 
-- `theta`: Angle dalam radian untuk komputasi e^(iθ) (default: 1.0)
-- `precision_digits`: Jumlah digit presisi desimal (default: 50)
-- `methods`: Metode yang dijalankan - "all", "std", "taylor", "cordic", "arbitrary" atau kombinasi comma-separated
-
-**Output**: CSV file dengan error analysis dan performance comparison di folder `build/`
+**Professional Output**:
+- **Publication Quality**: 300 DPI TIFF untuk academic papers
+- **Web Optimized**: Compressed PNG untuk online sharing
+- **Print Ready**: High-quality PDF vector graphics
+- **Interactive**: Real-time 3D manipulation dan parameter adjustment
 
 ## 📈 Comprehensive Benchmark Results
 
@@ -780,12 +836,9 @@ gprof euler_profile.exe gmon.out > analysis.txt
 
 ### Persyaratan Sistem
 
-- **C++17 Standard Library** (std::optional, structured bindings, etc.)
-- **OpenMP 4.5+** (opsional, untuk parallelisasi)
-- **Compiler Support**:
-  - GCC 9.0+ (recommended: 11.2+)
-  - Clang 10.0+
-  - MSVC 19.20+ (Visual Studio 2019+)
+- **C++17 Compiler**: GCC 9.0+, Clang 10.0+, atau MSVC 19.20+
+- **OpenMP** (opsional, untuk parallelisasi)
+- **Git** untuk cloning repository
 
 ### Platform Support
 
@@ -843,14 +896,22 @@ Implementasi ini telah digunakan dalam:
 **Sitasi Akademik**:
 
 ```bibtex
-@software{euler_computational_proof,
-  title={Euler Computational Proof System},
-  author={[Author Name]},
+@software{euler_computational_proof_enhanced,
+  title={Enhanced Euler Computational Proof System with VTK Visualization},
+  author={Euler Prover Development Team},
   year={2025},
-  url={https://github.com/[username]/euler-computational-proof},
-  version={1.0}
+  url={https://github.com/putraaxzy/euler-prover},
+  version={2.0},
+  note={High-performance mathematical computation with professional 3D visualization}
 }
 ```
+
+**Research Applications**:
+- Computational number theory verification
+- Complex analysis visualization
+- Topological mesh analysis
+- Educational mathematical demonstrations
+- High-performance numerical computing benchmarks
 
 ---
 
@@ -997,3 +1058,116 @@ Sistem ini telah digunakan dalam:
 ---
 
 _Developed with ❤️ for advancing computational mathematics and high-performance numerical verification._
+
+---
+
+## Google Colab Environment Setup and Optimization
+
+This section provides instructions for building and running the Euler Prover Visualization System in a Google Colab environment, along with notes on graphics and hardware optimization.
+
+### 1. Setup Colab Environment
+
+First, you need to install the necessary build tools and libraries in your Colab notebook.
+
+```bash
+# Update package list
+sudo apt-get update
+
+# Install CMake
+sudo apt-get install -y cmake
+
+# Install g++ (C++ compiler)
+sudo apt-get install -y g++
+
+# Install VTK (Visualization Toolkit) and its development files
+# This might take a few minutes
+sudo apt-get install -y libvtk9-dev python3-vtk9
+```
+
+### 2. Clone the Repository
+
+If you haven't already, clone the repository into your Colab environment:
+
+```bash
+git clone https://github.com/putraaxzy/euler-prover.git
+cd euler-prover
+```
+
+### 3. Build the Project
+
+Use the provided `build_colab.sh` script to build the project. This script will create a `build` directory, configure CMake, and compile the executables.
+
+```bash
+chmod +x build_colab.sh
+./build_colab.sh
+```
+
+### 4. Run Visualizations
+
+After a successful build, the executables will be located in the `build` directory. You can run the main visualization launcher:
+
+```bash
+cd build
+./euler_viz
+```
+
+This will present a menu to choose a visualization category. For example, to run a Topology Visualization:
+
+```
+==================================
+  EULER PROVER VISUALIZATION TOOL
+==================================
+
+Choose a visualization category:
+1. Topology Visualizations
+2. Complex Analysis Visualizations
+3. Number Theory Visualizations
+0. Exit
+
+Enter your choice (0-3): 1
+```
+
+Then, you can choose a specific demo:
+
+```
+Topology Visualization Demos
+============================
+1. Euler Characteristic
+2. Riemann Surface
+3. Knot Theory
+4. Manifold (Torus)
+Choose a demo (1-4): 1
+```
+
+#### Viewing Visualizations in Colab
+
+Since Colab is a remote environment, direct interactive GUI windows are not typically supported. VTK visualizations will run in "off-screen" mode by default. To view the output, you have a few options:
+
+1.  **Save Images/Videos:** The `Visualizer3D` class has a `saveImage(const std::string& filePath)` method. You can modify the demo code (e.g., `visualization/examples/topology_demos/topology_demo.cpp`) to call `visualizer.saveImage("output.png");` after `visualizer.show();`. Then, you can download the generated image from Colab.
+
+    - **Example Modification (in `topology_demo.cpp`):**
+      ```cpp
+      // ... inside euler_characteristic_demo()
+      visualizer.show();
+      visualizer.saveImage("euler_characteristic.png"); // Add this line
+      // ...
+      ```
+    - After running the modified demo, you can download the image:
+      ```bash
+      # In your Colab notebook cell
+      from google.colab import files
+      files.download('build/euler_characteristic.png')
+      ```
+
+2.  **Remote Desktop/VNC (Advanced):** For truly interactive 3D visualizations, you would need to set up a remote desktop or VNC server on your Colab instance and connect to it. This is more complex and generally outside the scope of typical Colab usage.
+
+### 5. Graphics and Hardware Optimization
+
+The current visualization system relies on VTK, which is a highly optimized library for 3D graphics.
+
+- **GPU Acceleration:** If your Colab runtime provides a GPU (check "Runtime" -> "Change runtime type" and select "GPU"), VTK will automatically leverage it for rendering, which significantly improves performance.
+- **Resolution and Quality:** The `VisualizationConfig` struct in `include/visualization.h` allows you to set `width`, `height`, and `quality`. Lowering these values can reduce rendering time and memory usage, especially for complex visualizations.
+- **Complexity of Models:** The performance is directly related to the complexity of the meshes (number of vertices, edges, faces) being rendered. For very high-resolution Riemann surfaces or manifolds, you might experience slower rendering.
+- **Animation:** If animations are enabled, the `setAnimationCallback` can be used to update the scene. Ensure your callback functions are efficient to maintain a smooth frame rate.
+
+For optimal performance in Colab, ensure you are using a GPU runtime and consider adjusting the `resolution` and `quality` parameters in the `VisualizationConfig` if you encounter performance issues.

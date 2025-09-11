@@ -6,6 +6,12 @@
 #include <string>
 #include <unordered_map>
 #include <cstdint>
+#include <cmath> // For sin, cos
+
+// Define M_PI if not already defined
+#ifndef M_PI
+#define M_PI 3.141592653589793238462643383279502884L
+#endif
 
 namespace topology {
     struct Vector3 {
@@ -82,4 +88,90 @@ namespace topology {
     };
     
     TopologyTestResult run_comprehensive_suite();
+
+    // Additional mesh creation functions for visualization
+    inline TopologicalMesh create_icosphere(int level) {
+        IcosphereGenerator generator;
+        return generator.generate(level);
+    }
+
+    inline TopologicalMesh create_torus(int resolution) {
+        TopologicalMesh mesh;
+        const double R = 1.0;  // major radius
+        const double r = 0.3;  // minor radius
+        
+        // Generate vertices
+        for (int i = 0; i < resolution; i++) {
+            double phi = 2.0 * M_PI * i / resolution;
+            for (int j = 0; j < resolution; j++) {
+                double theta = 2.0 * M_PI * j / resolution;
+                double x = (R + r * cos(theta)) * cos(phi);
+                double y = (R + r * cos(theta)) * sin(phi);
+                double z = r * sin(theta);
+                mesh.vertices.push_back({x, y, z});
+            }
+        }
+        
+        // Generate triangles
+        for (int i = 0; i < resolution; i++) {
+            int ip = (i + 1) % resolution;
+            for (int j = 0; j < resolution; j++) {
+                int jp = (j + 1) % resolution;
+                
+                // First triangle
+                mesh.faces.push_back({
+                    static_cast<size_t>(i * resolution + j),
+                    static_cast<size_t>(ip * resolution + j),
+                    static_cast<size_t>(i * resolution + jp)
+                });
+                
+                // Second triangle
+                mesh.faces.push_back({
+                    static_cast<size_t>(ip * resolution + j),
+                    static_cast<size_t>(ip * resolution + jp),
+                    static_cast<size_t>(i * resolution + jp)
+                });
+            }
+        }
+        
+        return mesh;
+    }
+    
+    inline TopologicalMesh create_klein_bottle(int resolution) {
+        TopologicalMesh mesh;
+        const double scale = 1.0;
+        
+        // Generate vertices
+        for (int i = 0; i <= resolution; i++) {
+            double u = i * 2.0 * M_PI / resolution;
+            for (int j = 0; j <= resolution; j++) {
+                double v = j * 2.0 * M_PI / resolution;
+                
+                // Parametric equations for Klein bottle
+                double x = scale * (cos(u) * (3 + cos(u/2) * sin(v) - sin(u/2) * sin(2*v)));
+                double y = scale * (sin(u) * (3 + cos(u/2) * sin(v) - sin(u/2) * sin(2*v)));
+                double z = scale * (sin(u/2) * sin(v) + cos(u/2) * sin(2*v));
+                
+                mesh.vertices.push_back({x, y, z});
+            }
+        }
+        
+        // Generate triangles
+        for (int i = 0; i < resolution; i++) {
+            for (int j = 0; j < resolution; j++) {
+                size_t idx = i * (resolution + 1) + j;
+                size_t idx_right = idx + 1;
+                size_t idx_below = idx + (resolution + 1);
+                size_t idx_below_right = idx_below + 1;
+                
+                // First triangle
+                mesh.faces.push_back({idx, idx_right, idx_below});
+                
+                // Second triangle
+                mesh.faces.push_back({idx_below, idx_right, idx_below_right});
+            }
+        }
+        
+        return mesh;
+    }
 }
