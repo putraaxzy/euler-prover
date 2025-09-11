@@ -14,7 +14,6 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 # Find required packages
 find_package(OpenMP REQUIRED)
 find_package(VTK REQUIRED)
-add_compile_definitions(VTK_FOUND)
 
 include_directories(include ${VTK_INCLUDE_DIRS})
 
