@@ -61,16 +61,18 @@ g++ $CXXFLAGS \
     -Iinclude \
     -DVTK_FOUND=0 \
     src/main.cpp src/number_theory.cpp src/complex_analysis.cpp \
-    src/topology.cpp src/progress.cpp src/rng.cpp \
+    src/topology.cpp src/progress.cpp src/rng.cpp src/visualization.cpp \
+    src/ultra_precision.cpp \
     -o build_colab/euler_lite
 
-# Create VTK-free visualization version (exclude visualization.cpp to avoid VTK headers)
+# Create VTK-free visualization version
 echo "Creating basic computation version..."
 g++ $CXXFLAGS \
     -Iinclude \
     -DVTK_FOUND=0 -DBASIC_BUILD=1 \
     src/main.cpp src/number_theory.cpp src/complex_analysis.cpp \
-    src/topology.cpp src/progress.cpp src/rng.cpp \
+    src/topology.cpp src/progress.cpp src/rng.cpp src/visualization.cpp \
+    src/ultra_precision.cpp \
     -o build_colab/euler_basic
 cd build_colab
 
