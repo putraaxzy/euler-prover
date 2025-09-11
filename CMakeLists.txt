@@ -42,7 +42,7 @@ target_link_libraries(euler_core OpenMP::OpenMP_CXX ${VTK_LIBRARIES})
 
 # Create main executable
 add_executable(euler src/main.cpp)
-target_link_libraries(euler euler_core)
+target_link_libraries(euler euler_core ${VTK_LIBRARIES})
 
 # Set output directory to build folder
 set_target_properties(euler PROPERTIES

@@ -26,10 +26,13 @@ def setup_euler_prover():
     ], check=True, capture_output=True)
     
     # Clone and build
-    if not os.path.exists("euler-prover"):
-        subprocess.run([
-            "git", "clone", "https://github.com/putraaxzy/euler-prover.git"
-        ], check=True)
+    # Clean up previous runs and clone repository
+    if os.path.exists("euler-prover"):
+        print("Removing existing repository for a clean setup...")
+        subprocess.run(["rm", "-rf", "euler-prover"], check=True)
+    subprocess.run([
+        "git", "clone", "https://github.com/putraaxzy/euler-prover.git"
+    ], check=True)
     
     os.chdir("euler-prover")
     
