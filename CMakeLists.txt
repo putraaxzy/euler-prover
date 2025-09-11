@@ -13,7 +13,22 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3 -DNDEBUG")
 
 # Find required packages
 find_package(OpenMP REQUIRED)
-find_package(VTK REQUIRED)
+
+if(COLAB_BUILD)
+    # Disable Qt-related modules for VTK in Colab environment
+    set(VTK_GROUP_ENABLE_Qt OFF CACHE BOOL "Disable Qt for VTK in Colab" FORCE)
+    set(VTK_MODULE_ENABLE_VTK_GUISupportQt NO CACHE BOOL "Disable VTK_GUISupportQt" FORCE)
+    set(VTK_MODULE_ENABLE_VTK_ViewsQt NO CACHE BOOL "Disable VTK_ViewsQt" FORCE)
+endif()
+
+# Request only headless VTK components (no Qt)
+find_package(VTK REQUIRED COMPONENTS
+    CommonCore
+    RenderingCore
+    IOImage
+    FiltersCore
+    InteractionStyle
+)
 
 include_directories(include ${VTK_INCLUDE_DIRS})
 
@@ -76,7 +91,9 @@ target_link_libraries(euler_viz euler_core ${VTK_LIBRARIES})
 set_target_properties(euler_viz PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
 
 # VTK specific settings
-vtk_module_autoinit(
-  TARGETS euler topology_demo complex_analysis_demo number_theory_demo euler_viz
-  MODULES ${VTK_LIBRARIES}
-)
+if(NOT COLAB_BUILD)
+    vtk_module_autoinit(
+      TARGETS euler topology_demo complex_analysis_demo number_theory_demo euler_viz
+      MODULES ${VTK_LIBRARIES}
+    )
+endif()

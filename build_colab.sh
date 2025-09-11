@@ -35,7 +35,8 @@ cmake .. \
     -DCMAKE_INTERPROCEDURAL_OPTIMIZATION=ON \
     -DVTK_GROUP_ENABLE_Qt=OFF \
     -DVTK_MODULE_ENABLE_VTK_GUISupportQt=NO \
-    -DVTK_MODULE_ENABLE_VTK_ViewsQt=NO
+    -DVTK_MODULE_ENABLE_VTK_ViewsQt=NO \
+    -DCOLAB_BUILD=ON
 
 # Build with all available cores (fallback if CMake fails)
 if make -j$(nproc) euler 2>/dev/null; then
@@ -48,14 +49,14 @@ else
         -Iinclude \
         -DVTK_FOUND=0 \
         src/main.cpp src/number_theory.cpp src/complex_analysis.cpp \
-        src/topology.cpp src/progress.cpp src/rng.cpp \
+        src/topology.cpp src/progress.cpp src/rng.cpp src/visualization.cpp \
         -o build_colab/euler
     cd build_colab
 fi
 
 # Always create lightweight version without VTK
 echo "Creating lightweight version..."
-cd ..
+cd .. 
 g++ $CXXFLAGS \
     -Iinclude \
     -DVTK_FOUND=0 \
