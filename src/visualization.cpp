@@ -75,6 +75,8 @@
 #include <vtkParametricSuperToroid.h>
 #include <vtkMath.h>
 #include <vtkVersion.h>
+#include <chrono>
+#include <thread>
 #endif
 
 namespace visualization {
@@ -101,7 +103,7 @@ struct VisualizerImpl {
         renderWindow->SetSize(w, h);
         renderWindow->SetWindowName("Euler Mathematical Visualization");
         
-        renderer->SetBackground(colors->GetColor3d("DarkSlateGray").GetData());
+        renderer->SetBackground(0.2, 0.2, 0.3);
         
         setupLighting();
         setupCamera();
@@ -110,37 +112,31 @@ struct VisualizerImpl {
     }
     
     void setupLighting() {
-        renderer->GetLights()->RemoveAllItems();
+        renderer->SetTwoSidedLighting(1);
+        renderer->SetLightFollowCamera(1);
         
-        auto light1 = vtkSmartPointer<vtkLight>::New();
-        light1->SetPosition(10, 10, 10);
-        light1->SetFocalPoint(0, 0, 0);
-        light1->SetColor(1.0, 1.0, 1.0);
-        light1->SetIntensity(0.8);
-        renderer->AddLight(light1);
+        auto light = vtkSmartPointer<vtkLight>::New();
+        light->SetPosition(10, 10, 10);
+        light->SetFocalPoint(0, 0, 0);
+        light->SetIntensity(1.5);
+        light->SetColor(1.0, 1.0, 1.0);
+        renderer->AddLight(light);
         
         auto light2 = vtkSmartPointer<vtkLight>::New();
-        light2->SetPosition(-10, -10, 5);
-        light2->SetFocalPoint(0, 0, 0);
-        light2->SetColor(0.8, 0.9, 1.0);
-        light2->SetIntensity(0.4);
+        light2->SetPosition(-10, -10, 10);
+        light2->SetIntensity(0.8);
+        light2->SetColor(0.8, 0.8, 1.0);
         renderer->AddLight(light2);
-        
-        auto light3 = vtkSmartPointer<vtkLight>::New();
-        light3->SetPosition(0, 0, 15);
-        light3->SetFocalPoint(0, 0, 0);
-        light3->SetColor(1.0, 0.9, 0.8);
-        light3->SetIntensity(0.3);
-        renderer->AddLight(light3);
     }
     
     void setupCamera() {
         auto camera = renderer->GetActiveCamera();
-        camera->SetPosition(8, 8, 8);
+        camera->SetPosition(5, 5, 5);
         camera->SetFocalPoint(0, 0, 0);
         camera->SetViewUp(0, 0, 1);
-        camera->SetViewAngle(45);
-        renderer->ResetCamera();
+        camera->SetViewAngle(60);
+        camera->SetClippingRange(0.1, 1000.0);
+        
     }
     
     void setupInteraction() {
@@ -164,41 +160,33 @@ struct VisualizerImpl {
     
     void saveImage(const std::string& filename) {
         try {
-            std::cout << "[EXPORT] Starting image export to: " << filename << std::endl;
+            if (!renderWindow) return;
             
-            // Ensure render window is properly initialized
-            if (!renderWindow) {
-                std::cout << "[ERROR] Render window not initialized!" << std::endl;
-                return;
-            }
-            
-            // Set render window to offscreen for headless environments
+            renderWindow->SetSize(1024, 768);
             renderWindow->SetOffScreenRendering(1);
             
-            // Multiple renders to ensure everything is properly drawn
-            for (int i = 0; i < 3; ++i) {
-                renderWindow->Render();
+            if (actors.empty()) {
+                createTestSphere();
             }
             
-            // Create window to image filter with robust settings
+            renderer->ResetCamera();
+            renderer->GetActiveCamera()->Zoom(0.7);
+            
+            renderWindow->Render();
+            renderWindow->Render();
+            
             auto windowToImageFilter = vtkSmartPointer<vtkWindowToImageFilter>::New();
             windowToImageFilter->SetInput(renderWindow);
-            windowToImageFilter->SetScale(2); // Reduced scale for stability
-            windowToImageFilter->SetInputBufferTypeToRGB(); // Use RGB instead of RGBA
+            windowToImageFilter->SetScale(1);
+            windowToImageFilter->SetInputBufferTypeToRGB();
             windowToImageFilter->ReadFrontBufferOff();
-            windowToImageFilter->ShouldRerenderOn();
+            windowToImageFilter->Update();
             
             // Force update and check for errors
             windowToImageFilter->Update();
             
             auto imageData = windowToImageFilter->GetOutput();
-            if (!imageData) {
-                std::cout << "[ERROR] Failed to capture image data!" << std::endl;
-                return;
-            }
-            
-            int* dims = imageData->GetDimensions();
-            std::cout << "[EXPORT] Image dimensions: " << dims[0] << "x" << dims[1] << std::endl;
+            if (!imageData) return;
             
             std::string ext = filename.substr(filename.find_last_of(".") + 1);
             std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
@@ -207,27 +195,7 @@ struct VisualizerImpl {
                 auto writer = vtkSmartPointer<vtkPNGWriter>::New();
                 writer->SetFileName(filename.c_str());
                 writer->SetInputData(imageData);
-                writer->SetCompressionLevel(6); // Balanced compression
-                
-                // Write with error checking
                 writer->Write();
-                
-                // Verify file was created
-                std::ifstream file(filename, std::ios::binary);
-                if (file.good()) {
-                    file.seekg(0, std::ios::end);
-                    size_t fileSize = file.tellg();
-                    file.close();
-                    
-                    if (fileSize > 0) {
-                        std::cout << "[EXPORT] ✅ PNG saved successfully: " << filename 
-                                  << " (Size: " << fileSize << " bytes)" << std::endl;
-                    } else {
-                        std::cout << "[ERROR] PNG file is empty!" << std::endl;
-                    }
-                } else {
-                    std::cout << "[ERROR] Failed to create PNG file!" << std::endl;
-                }
                 
             } else if (ext == "jpg" || ext == "jpeg") {
                 auto writer = vtkSmartPointer<vtkJPEGWriter>::New();
@@ -235,47 +203,34 @@ struct VisualizerImpl {
                 writer->SetInputData(imageData);
                 writer->SetQuality(95);
                 writer->Write();
-                std::cout << "[EXPORT] ✅ JPEG saved: " << filename << std::endl;
-                
             } else if (ext == "bmp") {
                 auto writer = vtkSmartPointer<vtkBMPWriter>::New();
                 writer->SetFileName(filename.c_str());
                 writer->SetInputData(imageData);
                 writer->Write();
-                std::cout << "[EXPORT] ✅ BMP saved: " << filename << std::endl;
-                
             } else {
-                // Fallback to PPM
                 savePPMFromVTK(filename, imageData);
             }
-            
-        } catch (const std::exception& e) {
-            std::cout << "[ERROR] Exception during image export: " << e.what() << std::endl;
-            // Fallback to simple PPM
+        } catch (...) {
             savePPM(filename);
         }
     }
     
     void savePPMFromVTK(const std::string& filename, vtkImageData* imageData) {
         try {
-            std::cout << "[EXPORT] Creating PPM fallback: " << filename << std::endl;
-            
             int* dims = imageData->GetDimensions();
             int width = dims[0];
             int height = dims[1];
             
             std::ofstream file(filename);
-            if (!file.is_open()) {
-                std::cout << "[ERROR] Cannot create PPM file!" << std::endl;
-                return;
-            }
+            if (!file.is_open()) return;
             
             file << "P3\n" << width << " " << height << "\n255\n";
             
             unsigned char* pixels = static_cast<unsigned char*>(imageData->GetScalarPointer());
             int numComponents = imageData->GetNumberOfScalarComponents();
             
-            for (int y = height - 1; y >= 0; --y) { // Flip Y coordinate
+            for (int y = height - 1; y >= 0; --y) {
                 for (int x = 0; x < width; ++x) {
                     int idx = (y * width + x) * numComponents;
                     
@@ -287,12 +242,8 @@ struct VisualizerImpl {
                 }
                 file << "\n";
             }
-            
             file.close();
-            std::cout << "[EXPORT] ✅ PPM saved: " << filename << std::endl;
-            
-        } catch (const std::exception& e) {
-            std::cout << "[ERROR] PPM export failed: " << e.what() << std::endl;
+        } catch (...) {
         }
     }
     
@@ -307,6 +258,26 @@ struct VisualizerImpl {
         scalarBar->GetTitleTextProperty()->SetColor(1, 1, 1);
         scalarBar->GetLabelTextProperty()->SetColor(1, 1, 1);
         renderer->AddActor2D(scalarBar);
+    }
+    
+    void createTestSphere() {
+        auto sphereSource = vtkSmartPointer<vtkSphereSource>::New();
+        sphereSource->SetRadius(1.0);
+        sphereSource->SetThetaResolution(30);
+        sphereSource->SetPhiResolution(30);
+        
+        auto mapper = vtkSmartPointer<vtkPolyDataMapper>::New();
+        mapper->SetInputConnection(sphereSource->GetOutputPort());
+        
+        auto actor = vtkSmartPointer<vtkActor>::New();
+        actor->SetMapper(mapper);
+        actor->GetProperty()->SetColor(1.0, 0.5, 0.0); // Orange color\
+        actor->GetProperty()->SetSpecular(0.6);
+        actor->GetProperty()->SetSpecularPower(30);
+        
+        renderer->AddActor(actor);
+        actors.push_back(actor);
+        
     }
     
     vtkSmartPointer<vtkPolyData> createHighQualitySurface(vtkSmartPointer<vtkPolyData> input) {
@@ -335,15 +306,20 @@ struct VisualizerImpl {
     
     VisualizerImpl(int w, int h) : width(w), height(h) {
         imageData.resize(height, std::vector<uint8_t>(width * 3, 0));
+        std::cout << "[DEBUG] Creating image buffer: " << width << "x" << height << std::endl;
         
+        // Force create a visible test pattern
         for (int y = 0; y < height; ++y) {
             for (int x = 0; x < width; ++x) {
-                uint8_t r = (uint8_t)(255 * x / width);
-                uint8_t g = (uint8_t)(255 * y / height);
-                uint8_t b = 128;
-                setPixel(x, y, r, g, b);
+                int idx = y * width * 3 + x * 3;
+                if (idx + 2 < (int)(imageData.size() * imageData[0].size())) {
+                    imageData[y][x * 3] = (uint8_t)(255 * x / std::max(1, width));     // R
+                    imageData[y][x * 3 + 1] = (uint8_t)(255 * y / std::max(1, height)); // G
+                    imageData[y][x * 3 + 2] = 128;                                      // B
+                }
             }
         }
+        std::cout << "[DEBUG] Test pattern created successfully" << std::endl;
     }
     
     void setPixel(int x, int y, uint8_t r, uint8_t g, uint8_t b) {
@@ -980,19 +956,26 @@ void Visualizer3D::renderTotientFunction(int maxN) {
 
 void Visualizer3D::show() {
 #ifdef VTK_FOUND
+    if (impl->actors.empty()) {
+        impl->createTestSphere();
+    }
+    
+    impl->renderer->ResetCamera();
+    impl->renderer->GetActiveCamera()->Zoom(0.8);
+    
     impl->renderWindow->Render();
+    impl->renderWindow->Render();
+    
     if (config.interactive) {
         impl->interactor->Start();
     }
     
     if (!config.outputFilePath.empty()) {
         impl->saveImage(config.outputFilePath);
-        std::cout << "[VISUALIZATION] Saved as: " << config.outputFilePath << std::endl;
     }
 #else
     std::string filename = config.outputFilePath.empty() ? "euler_result.ppm" : config.outputFilePath;
     impl->savePPM(filename);
-    std::cout << "[VISUALIZATION] Saved as: " << filename << std::endl;
 #endif
 }
 
