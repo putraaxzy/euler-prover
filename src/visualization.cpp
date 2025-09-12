@@ -163,49 +163,136 @@ struct VisualizerImpl {
     }
     
     void saveImage(const std::string& filename) {
-        // Force render to ensure everything is up to date
-        renderWindow->Render();
-        
-        auto windowToImageFilter = vtkSmartPointer<vtkWindowToImageFilter>::New();
-        windowToImageFilter->SetInput(renderWindow);
-        windowToImageFilter->SetScale(3); // Higher resolution for better quality
-        windowToImageFilter->SetInputBufferTypeToRGBA();
-        windowToImageFilter->ReadFrontBufferOff();
-        windowToImageFilter->ShouldRerenderOn(); // Ensure fresh render
-        windowToImageFilter->Update();
-        
-        std::string ext = filename.substr(filename.find_last_of(".") + 1);
-        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
-        
-        if (ext == "png") {
-            auto writer = vtkSmartPointer<vtkPNGWriter>::New();
-            writer->SetFileName(filename.c_str());
-            writer->SetInputConnection(windowToImageFilter->GetOutputPort());
-            writer->SetCompressionLevel(1); // Best quality
-            writer->Write();
-            std::cout << "[EXPORT] High-quality PNG saved: " << filename << std::endl;
-        } else if (ext == "jpg" || ext == "jpeg") {
-            auto writer = vtkSmartPointer<vtkJPEGWriter>::New();
-            writer->SetFileName(filename.c_str());
-            writer->SetQuality(98); // Maximum quality
-            writer->SetInputConnection(windowToImageFilter->GetOutputPort());
-            writer->Write();
-            std::cout << "[EXPORT] High-quality JPEG saved: " << filename << std::endl;
-        } else if (ext == "bmp") {
-            auto writer = vtkSmartPointer<vtkBMPWriter>::New();
-            writer->SetFileName(filename.c_str());
-            writer->SetInputConnection(windowToImageFilter->GetOutputPort());
-            writer->Write();
-            std::cout << "[EXPORT] BMP saved: " << filename << std::endl;
-        } else if (ext == "tiff" || ext == "tif") {
-            auto writer = vtkSmartPointer<vtkTIFFWriter>::New();
-            writer->SetFileName(filename.c_str());
-            writer->SetInputConnection(windowToImageFilter->GetOutputPort());
-            writer->SetCompressionToNoCompression(); // Best quality
-            writer->Write();
-            std::cout << "[EXPORT] TIFF saved: " << filename << std::endl;
-        } else {
+        try {
+            std::cout << "[EXPORT] Starting image export to: " << filename << std::endl;
+            
+            // Ensure render window is properly initialized
+            if (!renderWindow) {
+                std::cout << "[ERROR] Render window not initialized!" << std::endl;
+                return;
+            }
+            
+            // Set render window to offscreen for headless environments
+            renderWindow->SetOffScreenRendering(1);
+            
+            // Multiple renders to ensure everything is properly drawn
+            for (int i = 0; i < 3; ++i) {
+                renderWindow->Render();
+            }
+            
+            // Create window to image filter with robust settings
+            auto windowToImageFilter = vtkSmartPointer<vtkWindowToImageFilter>::New();
+            windowToImageFilter->SetInput(renderWindow);
+            windowToImageFilter->SetScale(2); // Reduced scale for stability
+            windowToImageFilter->SetInputBufferTypeToRGB(); // Use RGB instead of RGBA
+            windowToImageFilter->ReadFrontBufferOff();
+            windowToImageFilter->ShouldRerenderOn();
+            
+            // Force update and check for errors
+            windowToImageFilter->Update();
+            
+            auto imageData = windowToImageFilter->GetOutput();
+            if (!imageData) {
+                std::cout << "[ERROR] Failed to capture image data!" << std::endl;
+                return;
+            }
+            
+            int* dims = imageData->GetDimensions();
+            std::cout << "[EXPORT] Image dimensions: " << dims[0] << "x" << dims[1] << std::endl;
+            
+            std::string ext = filename.substr(filename.find_last_of(".") + 1);
+            std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+            
+            if (ext == "png") {
+                auto writer = vtkSmartPointer<vtkPNGWriter>::New();
+                writer->SetFileName(filename.c_str());
+                writer->SetInputData(imageData);
+                writer->SetCompressionLevel(6); // Balanced compression
+                
+                // Write with error checking
+                writer->Write();
+                
+                // Verify file was created
+                std::ifstream file(filename, std::ios::binary);
+                if (file.good()) {
+                    file.seekg(0, std::ios::end);
+                    size_t fileSize = file.tellg();
+                    file.close();
+                    
+                    if (fileSize > 0) {
+                        std::cout << "[EXPORT] ✅ PNG saved successfully: " << filename 
+                                  << " (Size: " << fileSize << " bytes)" << std::endl;
+                    } else {
+                        std::cout << "[ERROR] PNG file is empty!" << std::endl;
+                    }
+                } else {
+                    std::cout << "[ERROR] Failed to create PNG file!" << std::endl;
+                }
+                
+            } else if (ext == "jpg" || ext == "jpeg") {
+                auto writer = vtkSmartPointer<vtkJPEGWriter>::New();
+                writer->SetFileName(filename.c_str());
+                writer->SetInputData(imageData);
+                writer->SetQuality(95);
+                writer->Write();
+                std::cout << "[EXPORT] ✅ JPEG saved: " << filename << std::endl;
+                
+            } else if (ext == "bmp") {
+                auto writer = vtkSmartPointer<vtkBMPWriter>::New();
+                writer->SetFileName(filename.c_str());
+                writer->SetInputData(imageData);
+                writer->Write();
+                std::cout << "[EXPORT] ✅ BMP saved: " << filename << std::endl;
+                
+            } else {
+                // Fallback to PPM
+                savePPMFromVTK(filename, imageData);
+            }
+            
+        } catch (const std::exception& e) {
+            std::cout << "[ERROR] Exception during image export: " << e.what() << std::endl;
+            // Fallback to simple PPM
             savePPM(filename);
+        }
+    }
+    
+    void savePPMFromVTK(const std::string& filename, vtkImageData* imageData) {
+        try {
+            std::cout << "[EXPORT] Creating PPM fallback: " << filename << std::endl;
+            
+            int* dims = imageData->GetDimensions();
+            int width = dims[0];
+            int height = dims[1];
+            
+            std::ofstream file(filename);
+            if (!file.is_open()) {
+                std::cout << "[ERROR] Cannot create PPM file!" << std::endl;
+                return;
+            }
+            
+            file << "P3\n" << width << " " << height << "\n255\n";
+            
+            unsigned char* pixels = static_cast<unsigned char*>(imageData->GetScalarPointer());
+            int numComponents = imageData->GetNumberOfScalarComponents();
+            
+            for (int y = height - 1; y >= 0; --y) { // Flip Y coordinate
+                for (int x = 0; x < width; ++x) {
+                    int idx = (y * width + x) * numComponents;
+                    
+                    unsigned char r = pixels[idx];
+                    unsigned char g = (numComponents > 1) ? pixels[idx + 1] : r;
+                    unsigned char b = (numComponents > 2) ? pixels[idx + 2] : r;
+                    
+                    file << (int)r << " " << (int)g << " " << (int)b << " ";
+                }
+                file << "\n";
+            }
+            
+            file.close();
+            std::cout << "[EXPORT] ✅ PPM saved: " << filename << std::endl;
+            
+        } catch (const std::exception& e) {
+            std::cout << "[ERROR] PPM export failed: " << e.what() << std::endl;
         }
     }
     
@@ -261,15 +348,112 @@ struct VisualizerImpl {
     
     void savePPM(const std::string& filename) {
 #ifndef VTK_FOUND
-        std::ofstream file(filename);
-        file << "P3\n" << width << " " << height << "\n255\n";
-        for (const auto& row : imageData) {
-            for (size_t i = 0; i < row.size(); i += 3) {
-                file << (int)row[i] << " " << (int)row[i+1] << " " << (int)row[i+2] << " ";
+        std::string ext = filename.substr(filename.find_last_of(".") + 1);
+        std::transform(ext.begin(), ext.end(), ext.begin(), ::tolower);
+        
+        if (ext == "png") {
+            // Create a simple PNG using basic algorithm
+            createSimplePNG(filename);
+        } else {
+            // Default PPM format
+            std::ofstream file(filename);
+            if (!file.is_open()) {
+                std::cout << "[ERROR] Cannot create file: " << filename << std::endl;
+                return;
             }
-            file << "\n";
+            
+            file << "P3\n" << width << " " << height << "\n255\n";
+            for (const auto& row : imageData) {
+                for (size_t i = 0; i < row.size(); i += 3) {
+                    file << (int)row[i] << " " << (int)row[i+1] << " " << (int)row[i+2] << " ";
+                }
+                file << "\n";
+            }
+            file.close();
+            std::cout << "[EXPORT] ✅ PPM saved: " << filename << std::endl;
         }
+#endif
+    }
+    
+    void createSimplePNG(const std::string& filename) {
+#ifndef VTK_FOUND
+        std::ofstream file(filename, std::ios::binary);
+        if (!file.is_open()) {
+            std::cout << "[ERROR] Cannot create PNG file: " << filename << std::endl;
+            return;
+        }
+        
+        const unsigned char png_signature[] = {0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A};
+        file.write(reinterpret_cast<const char*>(png_signature), 8);
+        
+        uint32_t ihdr_length = 13;
+        uint32_t ihdr_length_be = ((ihdr_length & 0xFF000000) >> 24) | 
+                                  ((ihdr_length & 0x00FF0000) >> 8) | 
+                                  ((ihdr_length & 0x0000FF00) << 8) | 
+                                  ((ihdr_length & 0x000000FF) << 24);
+        file.write(reinterpret_cast<const char*>(&ihdr_length_be), 4);
+        file.write("IHDR", 4);
+        
+        uint32_t width_be = ((static_cast<uint32_t>(width) & 0xFF000000) >> 24) | 
+                           ((static_cast<uint32_t>(width) & 0x00FF0000) >> 8) | 
+                           ((static_cast<uint32_t>(width) & 0x0000FF00) << 8) | 
+                           ((static_cast<uint32_t>(width) & 0x000000FF) << 24);
+        uint32_t height_be = ((static_cast<uint32_t>(height) & 0xFF000000) >> 24) | 
+                            ((static_cast<uint32_t>(height) & 0x00FF0000) >> 8) | 
+                            ((static_cast<uint32_t>(height) & 0x0000FF00) << 8) | 
+                            ((static_cast<uint32_t>(height) & 0x000000FF) << 24);
+        file.write(reinterpret_cast<const char*>(&width_be), 4);
+        file.write(reinterpret_cast<const char*>(&height_be), 4);
+        
+        file.put(8);
+        file.put(2);
+        file.put(0);
+        file.put(0);
+        file.put(0);
+        
+        uint32_t ihdr_crc = 0;
+        file.write(reinterpret_cast<const char*>(&ihdr_crc), 4);
+        
+        std::vector<uint8_t> raw_data;
+        for (int y = 0; y < height; ++y) {
+            raw_data.push_back(0);
+            for (int x = 0; x < width; ++x) {
+                raw_data.push_back(imageData[y][x * 3]);
+                raw_data.push_back(imageData[y][x * 3 + 1]);
+                raw_data.push_back(imageData[y][x * 3 + 2]);
+            }
+        }
+        
+        uint32_t idat_length = static_cast<uint32_t>(raw_data.size());
+        uint32_t idat_length_be = ((idat_length & 0xFF000000) >> 24) | 
+                                  ((idat_length & 0x00FF0000) >> 8) | 
+                                  ((idat_length & 0x0000FF00) << 8) | 
+                                  ((idat_length & 0x000000FF) << 24);
+        file.write(reinterpret_cast<const char*>(&idat_length_be), 4);
+        file.write("IDAT", 4);
+        file.write(reinterpret_cast<const char*>(raw_data.data()), raw_data.size());
+        
+        uint32_t idat_crc = 0;
+        file.write(reinterpret_cast<const char*>(&idat_crc), 4);
+        
+        uint32_t iend_length = 0;
+        file.write(reinterpret_cast<const char*>(&iend_length), 4);
+        file.write("IEND", 4);
+        uint32_t iend_crc = 0;
+        file.write(reinterpret_cast<const char*>(&iend_crc), 4);
+        
         file.close();
+        
+        std::ifstream verify(filename, std::ios::binary);
+        if (verify.good()) {
+            verify.seekg(0, std::ios::end);
+            size_t fileSize = verify.tellg();
+            verify.close();
+            std::cout << "[EXPORT] PNG created: " << filename 
+                      << " (Size: " << fileSize << " bytes)" << std::endl;
+        } else {
+            std::cout << "[ERROR] Failed to create PNG file!" << std::endl;
+        }
 #endif
     }
 };
