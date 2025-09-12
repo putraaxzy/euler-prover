@@ -334,7 +334,16 @@ struct VisualizerImpl {
     int width, height;
     
     VisualizerImpl(int w, int h) : width(w), height(h) {
-        imageData.resize(height, std::vector<uint8_t>(width * 3, 255));
+        imageData.resize(height, std::vector<uint8_t>(width * 3, 0));
+        
+        for (int y = 0; y < height; ++y) {
+            for (int x = 0; x < width; ++x) {
+                uint8_t r = (uint8_t)(255 * x / width);
+                uint8_t g = (uint8_t)(255 * y / height);
+                uint8_t b = 128;
+                setPixel(x, y, r, g, b);
+            }
+        }
     }
     
     void setPixel(int x, int y, uint8_t r, uint8_t g, uint8_t b) {
@@ -548,8 +557,8 @@ void Visualizer3D::renderRiemannSurface(
 #else
     for (int i = 0; i < resolution; ++i) {
         for (int j = 0; j < resolution; ++j) {
-            double x = xMin + (xMax - xMin) * i / resolution;
-            double y = yMin + (yMax - yMin) * j / resolution;
+            double x = xMin + (xMax - xMin) * i / (double)resolution;
+            double y = yMin + (yMax - yMin) * j / (double)resolution;
             
             complex_analysis::Complex z(x, y);
             complex_analysis::Complex result = function(z);
@@ -561,9 +570,12 @@ void Visualizer3D::renderRiemannSurface(
             uint8_t g = (uint8_t)(128 + 127 * std::cos(phase));
             uint8_t b = (uint8_t)(255 * std::min(1.0, magnitude / 2.0));
             
-            int px = (int)(impl->width * i / resolution);
-            int py = (int)(impl->height * j / resolution);
-            impl->setPixel(px, py, r, g, b);
+            int px = (int)(impl->width * i / (double)resolution);
+            int py = (int)(impl->height * j / (double)resolution);
+            
+            if (px >= 0 && px < impl->width && py >= 0 && py < impl->height) {
+                impl->setPixel(px, py, r, g, b);
+            }
         }
     }
 #endif
