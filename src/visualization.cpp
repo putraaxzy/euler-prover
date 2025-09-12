@@ -163,11 +163,15 @@ struct VisualizerImpl {
     }
     
     void saveImage(const std::string& filename) {
+        // Force render to ensure everything is up to date
+        renderWindow->Render();
+        
         auto windowToImageFilter = vtkSmartPointer<vtkWindowToImageFilter>::New();
         windowToImageFilter->SetInput(renderWindow);
-        windowToImageFilter->SetScale(2);
+        windowToImageFilter->SetScale(3); // Higher resolution for better quality
         windowToImageFilter->SetInputBufferTypeToRGBA();
         windowToImageFilter->ReadFrontBufferOff();
+        windowToImageFilter->ShouldRerenderOn(); // Ensure fresh render
         windowToImageFilter->Update();
         
         std::string ext = filename.substr(filename.find_last_of(".") + 1);
@@ -177,23 +181,29 @@ struct VisualizerImpl {
             auto writer = vtkSmartPointer<vtkPNGWriter>::New();
             writer->SetFileName(filename.c_str());
             writer->SetInputConnection(windowToImageFilter->GetOutputPort());
+            writer->SetCompressionLevel(1); // Best quality
             writer->Write();
+            std::cout << "[EXPORT] High-quality PNG saved: " << filename << std::endl;
         } else if (ext == "jpg" || ext == "jpeg") {
             auto writer = vtkSmartPointer<vtkJPEGWriter>::New();
             writer->SetFileName(filename.c_str());
-            writer->SetQuality(95);
+            writer->SetQuality(98); // Maximum quality
             writer->SetInputConnection(windowToImageFilter->GetOutputPort());
             writer->Write();
+            std::cout << "[EXPORT] High-quality JPEG saved: " << filename << std::endl;
         } else if (ext == "bmp") {
             auto writer = vtkSmartPointer<vtkBMPWriter>::New();
             writer->SetFileName(filename.c_str());
             writer->SetInputConnection(windowToImageFilter->GetOutputPort());
             writer->Write();
+            std::cout << "[EXPORT] BMP saved: " << filename << std::endl;
         } else if (ext == "tiff" || ext == "tif") {
             auto writer = vtkSmartPointer<vtkTIFFWriter>::New();
             writer->SetFileName(filename.c_str());
             writer->SetInputConnection(windowToImageFilter->GetOutputPort());
+            writer->SetCompressionToNoCompression(); // Best quality
             writer->Write();
+            std::cout << "[EXPORT] TIFF saved: " << filename << std::endl;
         } else {
             savePPM(filename);
         }

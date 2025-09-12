@@ -255,11 +255,21 @@ int main(int argc, char** argv) {
         std::transform(submode.begin(), submode.end(), submode.begin(), ::tolower);
 
         visualization::VisualizationConfig config;
-        config.width = 800;
-        config.height = 600;
-        config.outputFilePath = "euler_result.ppm";
+        config.width = 1920;  // High resolution for detailed 3D export
+        config.height = 1080;
+        config.interactive = false; // Non-interactive for Colab
+        
+        // Determine output filename based on submode
+        std::string outputFile = "euler_3d_";
+        if (argc > 2) outputFile += argv[2];
+        if (argc > 3) outputFile += "_" + std::string(argv[3]);
+        outputFile += ".png";
+        config.outputFilePath = outputFile;
         
         visualization::Visualizer3D visualizer(config);
+        
+        std::cout << "[3D VISUALIZATION] High-resolution rendering: " << config.width << "x" << config.height << std::endl;
+        std::cout << "[3D VISUALIZATION] Output file: " << outputFile << std::endl;
 
         if (submode == "topology") {
             std::string shape = (argc > 3) ? argv[3] : "icosphere";

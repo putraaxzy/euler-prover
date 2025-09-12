@@ -41,6 +41,13 @@ cmake .. \
 # Build with all available cores (fallback if CMake fails)
 if make -j$(nproc) euler 2>/dev/null; then
     echo "✓ CMake build successful"
+    # Check if euler was built in current directory or subdirectory
+    if [ ! -f "euler" ] && [ -f "bin/euler" ]; then
+        cp bin/euler ./
+    fi
+    if [ ! -f "euler" ] && [ -f "*/euler" ]; then
+        find . -name "euler" -type f -executable -exec cp {} ./ \;
+    fi
 else
     echo "⚠ CMake build failed, using fallback compilation"
     cd ..
@@ -108,18 +115,35 @@ fi
 cd build_colab
 
 echo "✓ Build completed successfully!"
+echo ""
+echo "=== BUILD DIRECTORY CONTENTS ==="
+ls -la
+echo ""
 
-# Check which executables were actually created
+# Check which executables were actually created and make them executable
 if [ -f "euler" ]; then
+    chmod +x euler
     echo "✓ Full version: ./euler (with VTK visualization)"
+elif [ -f "bin/euler" ]; then
+    cp bin/euler ./
+    chmod +x euler
+    echo "✓ Full version: ./euler (with VTK visualization) - copied from bin/"
+else
+    echo "⚠ Full version not found"
 fi
 
 if [ -f "euler_lite" ]; then
+    chmod +x euler_lite
     echo "✓ Lite version: ./euler_lite (PPM output only)"
+else
+    echo "⚠ Lite version not found"
 fi
 
 if [ -f "euler_basic" ]; then
+    chmod +x euler_basic
     echo "✓ Basic version: ./euler_basic (computation only)"
+else
+    echo "⚠ Basic version not found"
 fi
 
 echo ""
